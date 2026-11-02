@@ -50,6 +50,7 @@ class InstallerTests(unittest.TestCase):
         self.environment = dict(os.environ, PATH=str(self.directory) + os.pathsep + os.environ.get("PATH", ""),
                                 INSTALL_CALLS=str(self.calls))
         self.environment.update(BOOTSTRAP_PAYLOAD=str(ROOT / "scripts/install_plugin.py"),
+                                CODEX_HOME=str(self.directory / "codex-home"),
                                 TEMP=str(self.directory), TMP=str(self.directory), TMPDIR=str(self.directory))
         if os.name != "nt":
             curl = self.directory / "curl"
@@ -97,6 +98,16 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(calls[-1], ["plugin", "add", "playbook-testing@testing-playbook"])
         self.assertEqual(len(calls), 3)
         self.assertIn("/hooks", result.stdout)
+        self.assertIn("$playbook-testing init", result.stdout)
+
+    def test_existing_standalone_skill_is_preserved_with_a_migration_hint(self):
+        standalone = Path(self.environment["CODEX_HOME"]) / "skills/playbook-testing/SKILL.md"
+        standalone.parent.mkdir(parents=True)
+        standalone.write_text("older standalone skill", encoding="utf-8")
+        result, _ = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Existing standalone skill preserved", result.stdout)
+        self.assertEqual(standalone.read_text(), "older standalone skill")
 
     def test_legacy_cli_reports_registration_only(self):
         result, calls = self.run_installer("legacy")

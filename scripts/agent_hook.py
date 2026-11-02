@@ -28,7 +28,7 @@ def handle(event):
     except quality.QualityError:
         return {}
     if not (repo / quality.POLICY).is_file():
-        return (context(name, "Playbook Testing is available. Run its setup skill to map project tests before enabling hooks.")
+        return (context(name, "Playbook Testing is available. Run $playbook-testing init to map project tests before enabling hooks.")
                 if name == "SessionStart" else {})
     try:
         policy = quality.load_policy(repo)

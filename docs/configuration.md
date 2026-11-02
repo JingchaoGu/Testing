@@ -48,6 +48,25 @@ pytest 的测试命令可用 `["{python}", "-m", "pytest", "--junitxml={report}"
 
 ## 正式阶段与证据
 
+接入后有统一终端入口：
+
+```sh
+python3 .testing-tools/testing.py commands
+python3 .testing-tools/testing.py check --stage task-finish
+python3 .testing-tools/testing.py doctor
+python3 .testing-tools/testing.py hooks status
+python3 .testing-tools/testing.py hooks on
+python3 .testing-tools/testing.py hooks off
+python3 .testing-tools/testing.py pin check doctor
+python3 .testing-tools/testing.py unpin check doctor
+```
+
+Windows 将 `python3` 换成 `py -3`。这些命令支持 `--repo <仓库>`；doctor 只读，不运行测试，配置错误返回非零，也不推断 Codex 信任或远端保护。hooks on/off 只改项目 agent_hooks，保留其他字段；on 要求 edit/task-finish 非空、超时总和分别不超过 100/150 秒，为事件开销留出余量。status 不写文件。pin 的快捷 skill 仅写当前项目 `.agents/skills/pt-<命令>/SKILL.md`，冲突或链接路径拒绝变更；unpin 保留用户修改和目录中其他文件。
+
+聊天中的 `$playbook-testing init/plan/fix/ci/release` 是代理工作流，不是终端子命令。check push 需要真实 Git ref 输入，因此终端 check 不以 HEAD 模拟；使用 pre-push 接入执行。
+
+原有底层执行与证据接口继续可用：
+
 ```sh
 python3 .testing-tools/quality.py run --stage pr
 python3 .testing-tools/quality.py verify --stage pr

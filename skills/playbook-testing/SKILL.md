@@ -1,6 +1,6 @@
 ---
 name: playbook-testing
-description: "将 Microsoft Engineering Playbook 的核心测试逻辑落实为分阶段工作流。用于用户要求制定测试策略、建设或审计 AI 编码代理 hook、Git pre-commit/pre-push、PR CI 与发布门禁，或统一现有仓库的测试命令及通过证据。"
+description: "将 Microsoft Engineering Playbook 测试逻辑落实为分阶段工作流。支持 $playbook-testing init、plan、check、fix、doctor、hooks、ci、release 与 pin/unpin 快捷入口；用于测试策略、AI 编码代理 hook、Git pre-commit/pre-push、PR CI 与发布门禁的建设、执行及审计。"
 ---
 
 # Playbook 测试工作流
@@ -8,6 +8,24 @@ description: "将 Microsoft Engineering Playbook 的核心测试逻辑落实为�
 将“验收标准 → 用例与风险 → 快速反馈 → 合并门禁 → 部署验证 → 生产反馈 → 回归保护”落实到用户指定的仓库。复用其语言、测试框架、脚本与流水线；只建设当前任务需要的阶段。
 
 本技能提炼微软 ISE Engineering Playbook 的测试原则；hook 分配与证据契约是工程化建议，不是微软官方 hook 实现。本插件已包含共享执行器与 Codex hooks；新项目通过 [setup](../setup/SKILL.md) 映射真实测试命令后接入，安装插件本身不会配置 Git 或远端门禁。
+
+## 命令入口
+
+显式调用 `$playbook-testing <命令> [参数或自然语言约束]` 时，按 [命令工作流](references/commands.md) 仅执行对应命令。无参数显式调用时展示下面的菜单和当前是否已有策略，不自动初始化或运行测试。自然语言请求仍按下文工作流处理。
+
+| 命令 | 作用 |
+| --- | --- |
+| `init` | 发现真实测试，配置项目代理检查和 Git hooks；CI 按需接入 |
+| `plan` | 验收标准、风险、测试层次和阶段方案 |
+| `check [阶段]` | 运行既有阶段，默认 task-finish |
+| `fix [阶段]` | 定位失败、最小修复、补回归并复测 |
+| `doctor` | 只读检查策略、hook 包装脚本和证据状态 |
+| `hooks [status/on/off]` | 查看或切换当前项目的代理自动检查 |
+| `ci` | 将同一测试策略接入项目 CI 与 PR gate |
+| `release` | 验证已部署候选，先冒烟再深入检查 |
+| `pin/unpin <命令...>` | 注册/移除项目 `$pt-check` 等独立 skill 入口 |
+
+这些是 skill 内的命令路由，不是 Codex 内置斜杠命令。插件根目录为本文件所在目录的上两级；确定性操作使用该根目录的 `scripts/testing.py`。在终端或 hook 内使用实际解释器与脚本路径，不把 `$playbook-testing` 当 shell 可执行文件。
 
 ## 先确定当前任务
 

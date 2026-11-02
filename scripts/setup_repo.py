@@ -13,6 +13,7 @@ def setup(repo, github=False):
         repo / ".testing-tools/quality.py": plugin / "scripts/quality.py",
         repo / ".testing-tools/unittest_junit.py": plugin / "scripts/unittest_junit.py",
         repo / ".testing-tools/install_git_hooks.py": plugin / "scripts/install_git_hooks.py",
+        repo / ".testing-tools/testing.py": plugin / "scripts/testing.py",
     }
     if not (repo / quality.POLICY).exists():
         copies[repo / quality.POLICY] = plugin / "templates/testing-policy.json"

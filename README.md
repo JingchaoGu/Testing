@@ -6,14 +6,53 @@
 
 ## 安装与分享
 
-```sh
-git clone https://github.com/JingchaoGu/Testing.git
-codex plugin marketplace add ./Testing
+前置条件：Git、Python 3.10+、Codex CLI 已安装并可从终端调用。仓库是私有的，需先通过 Git 凭据管理器、SSH 等现有方式取得访问权限；不需要将 token 写进命令。
+
+### 快速安装：Windows PowerShell
+
+```powershell
+codex plugin marketplace add JingchaoGu/Testing --ref main
+if ($LASTEXITCODE -ne 0) { throw 'Marketplace registration failed' }
+codex plugin add playbook-testing@testing-playbook
 ```
 
-从桌面端插件目录的 `Testing Playbook` 来源安装 `Playbook Testing`，运行 setup。根据客户端要求刷新/重启插件目录，再通过 `/hooks` 审阅并信任当前 hook 定义。Windows hooks 使用 `py -3`，macOS/Linux 使用 `python3`；运行前确保对应命令能找到 Python 3.10+。安装后不会自动安装 Git hooks，也不会自动配置远端分支规则。
+### 快速安装：Linux
 
-也可把本仓库作为 Git marketplace 分享：`codex plugin marketplace add JingchaoGu/Testing`。这是私有仓库，接收者需要访问权限。使用本地包时，解压生成的 ZIP，然后把解压出的插件根目录作为本地 marketplace 添加。
+```sh
+codex plugin marketplace add JingchaoGu/Testing --ref main &&
+codex plugin add playbook-testing@testing-playbook
+```
+
+### 快速安装：macOS
+
+```sh
+codex plugin marketplace add JingchaoGu/Testing --ref main &&
+codex plugin add playbook-testing@testing-playbook
+```
+
+三平台使用同一个 marketplace 与插件标识。`plugin add` 需要支持该子命令的 CLI；旧版可在注册后到桌面端插件目录的 `Testing Playbook` 来源安装 `Playbook Testing`。参见 [Codex CLI 插件命令](https://learn.chatgpt.com/docs/cli/reference)。
+
+### 带检查与旧版兼容的安装脚本
+
+已克隆或已解压插件包时，可直接运行以下脚本。脚本检查依赖、注册 marketplace，并检测 CLI 是否支持直接安装；不支持时明确提示桌面端安装，失败时保留非零退出码。
+
+Windows PowerShell（从仓库根执行）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
+```
+
+Linux / macOS（从仓库根执行）：
+
+```sh
+sh ./scripts/install.sh
+```
+
+`ExecutionPolicy Bypass` 仅作用于这一次脚本进程，不修改系统策略。私有仓库不采用匿名 raw 下载后执行的命令。需要源码时先使用 `git clone https://github.com/JingchaoGu/Testing.git`。
+
+安装后开启新会话，运行插件 setup，并通过 `/hooks` 审阅并信任当前 hook 定义。Windows hooks 使用 `py -3`，macOS/Linux 使用 `python3`。安装脚本不安装项目 Git hooks、不改变远端分支规则，也不写入 hook 信任记录。
+
+使用本地包时，解压生成的 ZIP 后，可将解压出的插件根目录作为本地 marketplace 添加：`codex plugin marketplace add ./playbook-testing`，再执行同一个 `codex plugin add` 命令。
 
 目前带生命周期 hooks 的插件适合 Codex 桌面端手动安装/本地或团队分发，不能直接提交公共插件目录。hooks 需要本地执行环境及用户信任；云端编排不保证运行这些脚本。参见 [OpenAI 打包说明](https://developers.openai.com/plugins/build/plugins) 和 [Hooks](https://learn.chatgpt.com/docs/hooks)。
 
@@ -71,6 +110,6 @@ python3 scripts/quality.py verify --stage pr
 python3 scripts/package_plugin.py
 ```
 
-ZIP 默认输出到 `dist/playbook-testing-0.1.0.zip`。包含插件清单、两个 skills、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
+ZIP 默认输出到 `dist/playbook-testing-0.1.1.zip`。包含插件清单、两个 skills、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
 
-本仓库 CI 在 Linux 与 Windows 上验证实际提交/推送 hook 和失败路径，并构建分发包。它不会部署应用。源自微软 Playbook 的原则均在参考资料中注明；该插件并非微软或 OpenAI 的官方产品。
+本仓库 CI 在 Linux、Windows 与 macOS 上验证实际提交/推送 hook、安装脚本和失败路径，并构建分发包。它不会部署应用。源自微软 Playbook 的原则均在参考资料中注明；该插件并非微软或 OpenAI 的官方产品。

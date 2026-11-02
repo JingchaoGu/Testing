@@ -6,7 +6,29 @@
 
 ## 安装与分享
 
-前置条件：Git、Python 3.10+、Codex CLI 已安装并可从终端调用。仓库是私有的，需先通过 Git 凭据管理器、SSH 等现有方式取得访问权限；不需要将 token 写进命令。
+前置条件：Git、Python 3.10+、Codex CLI 已安装并可从终端调用。仓库现已公开，下载不需要 GitHub token。
+
+### 一行安装：curl / irm
+
+Linux / macOS（Bash；启用 pipefail，使下载失败也返回失败）：
+
+```sh
+bash -o pipefail -c 'curl -fsSL https://raw.githubusercontent.com/JingchaoGu/Testing/main/install.sh | sh'
+```
+
+Windows PowerShell（`irm` 是 `Invoke-RestMethod` 的别名）：
+
+```powershell
+irm https://raw.githubusercontent.com/JingchaoGu/Testing/main/install.ps1 -ErrorAction Stop | iex
+```
+
+也可使用 `iwr`（`Invoke-WebRequest`）：
+
+```powershell
+iex ((iwr https://raw.githubusercontent.com/JingchaoGu/Testing/main/install.ps1 -UseBasicParsing -ErrorAction Stop).Content)
+```
+
+根目录引导脚本可直接从管道执行，不依赖本地已克隆的文件。它先下载共享 Python 安装器到临时文件，再运行检查、注册 marketplace 和安装插件；下载或安装失败时返回错误，并清理临时文件。不会自动安装系统依赖或修改 hook 信任记录。
 
 ### 快速安装：Windows PowerShell
 
@@ -48,7 +70,7 @@ Linux / macOS（从仓库根执行）：
 sh ./scripts/install.sh
 ```
 
-`ExecutionPolicy Bypass` 仅作用于这一次脚本进程，不修改系统策略。私有仓库不采用匿名 raw 下载后执行的命令。需要源码时先使用 `git clone https://github.com/JingchaoGu/Testing.git`。
+`ExecutionPolicy Bypass` 仅作用于这一次脚本进程，不修改系统策略。需要源码时先使用 `git clone https://github.com/JingchaoGu/Testing.git`。
 
 安装后开启新会话，运行插件 setup，并通过 `/hooks` 审阅并信任当前 hook 定义。Windows hooks 使用 `py -3`，macOS/Linux 使用 `python3`。安装脚本不安装项目 Git hooks、不改变远端分支规则，也不写入 hook 信任记录。
 
@@ -110,6 +132,6 @@ python3 scripts/quality.py verify --stage pr
 python3 scripts/package_plugin.py
 ```
 
-ZIP 默认输出到 `dist/playbook-testing-0.1.1.zip`。包含插件清单、两个 skills、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
+ZIP 默认输出到 `dist/playbook-testing-0.1.2.zip`。包含插件清单、两个 skills、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
 
 本仓库 CI 在 Linux、Windows 与 macOS 上验证实际提交/推送 hook、安装脚本和失败路径，并构建分发包。它不会部署应用。源自微软 Playbook 的原则均在参考资料中注明；该插件并非微软或 OpenAI 的官方产品。

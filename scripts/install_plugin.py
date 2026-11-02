@@ -13,7 +13,7 @@ def main():
         print("Python 3.10+ is required.", file=sys.stderr)
         return 1
     if not shutil.which("git"):
-        print("Git is required. Install Git and sign in for access to the private repository.", file=sys.stderr)
+        print("Git is required. Install Git before running this installer.", file=sys.stderr)
         return 1
     codex = shutil.which("codex")
     if not codex:

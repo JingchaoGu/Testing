@@ -22,6 +22,14 @@ if arguments == ["plugin", "add", "playbook-testing@testing-playbook"]:
     sys.exit(9 if mode == "plugin-fail" else 0)
 sys.exit(99)
 '''
+FAKE_CURL = '''import os, shutil, sys
+arguments = sys.argv[1:]
+assert "https://raw.githubusercontent.com/JingchaoGu/Testing/main/scripts/install_plugin.py" in arguments
+destination = arguments[arguments.index("--output") + 1]
+# Write a valid payload before failing to prove partial downloads are not run.
+shutil.copyfile(os.environ["BOOTSTRAP_PAYLOAD"], destination)
+sys.exit(22 if os.environ.get("BOOTSTRAP_DOWNLOAD_FAIL") else 0)
+'''
 
 
 class InstallerTests(unittest.TestCase):
@@ -41,17 +49,44 @@ class InstallerTests(unittest.TestCase):
         self.calls = self.directory / "calls.jsonl"
         self.environment = dict(os.environ, PATH=str(self.directory) + os.pathsep + os.environ.get("PATH", ""),
                                 INSTALL_CALLS=str(self.calls))
+        self.environment.update(BOOTSTRAP_PAYLOAD=str(ROOT / "scripts/install_plugin.py"),
+                                TEMP=str(self.directory), TMP=str(self.directory), TMPDIR=str(self.directory))
+        if os.name != "nt":
+            curl = self.directory / "curl"
+            implementation = self.directory / "fake_curl.py"
+            implementation.write_text(FAKE_CURL, encoding="utf-8")
+            curl.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} {shlex.quote(str(implementation))} "$@"\n', encoding="utf-8")
+            curl.chmod(0o755)
 
-    def run_installer(self, mode="modern"):
+    def run_installer(self, mode="modern", bootstrap=False, download_fail=False):
         self.environment["INSTALL_MODE"] = mode
+        self.environment["BOOTSTRAP_DOWNLOAD_FAIL"] = "1" if download_fail else ""
+        script_input = None
         if os.name == "nt":
             shell = shutil.which("pwsh") or shutil.which("powershell")
             self.assertIsNotNone(shell, "Windows installer tests require PowerShell")
-            argv = [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ROOT / "scripts/install.ps1")]
+            if bootstrap:
+                command = '''function Invoke-WebRequest {
+                    [CmdletBinding()]
+                    param($Uri, $OutFile, [switch]$UseBasicParsing)
+                    if ($Uri -ne 'https://raw.githubusercontent.com/JingchaoGu/Testing/main/scripts/install_plugin.py') { throw 'Unexpected URL' }
+                    Copy-Item -LiteralPath $env:BOOTSTRAP_PAYLOAD -Destination $OutFile
+                    if ($env:BOOTSTRAP_DOWNLOAD_FAIL) { throw 'Download failed after writing partial content' }
+                }
+                '''
+                harness = self.directory / "bootstrap-test.ps1"
+                harness.write_text(command + (ROOT / "install.ps1").read_text(encoding="utf-8"), encoding="utf-8")
+                argv = [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(harness)]
+            else:
+                argv = [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ROOT / "scripts/install.ps1")]
         else:
-            argv = ["/bin/sh", str(ROOT / "scripts/install.sh")]
+            if bootstrap:
+                argv = ["/bin/sh"]
+                script_input = (ROOT / "install.sh").read_text(encoding="utf-8")
+            else:
+                argv = ["/bin/sh", str(ROOT / "scripts/install.sh")]
         result = subprocess.run(argv, cwd=self.directory, env=self.environment, capture_output=True,
-                                text=True, encoding="utf-8", errors="replace", timeout=30)
+                                input=script_input, text=True, encoding="utf-8", errors="replace", timeout=30)
         calls = [json.loads(line) for line in self.calls.read_text().splitlines()] if self.calls.exists() else []
         return result, calls
 
@@ -87,6 +122,24 @@ class InstallerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Git is required", result.stderr)
         self.assertFalse(self.calls.exists())
+
+    def test_streamed_bootstrap_installs_without_local_sibling_files(self):
+        result, calls = self.run_installer(bootstrap=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls[-1], ["plugin", "add", "playbook-testing@testing-playbook"])
+        self.assertEqual(list(self.directory.glob("playbook-bootstrap-*")), [])
+
+    def test_download_failure_never_executes_partial_payload(self):
+        result, calls = self.run_installer(bootstrap=True, download_fail=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(calls, [])
+        self.assertEqual(list(self.directory.glob("playbook-bootstrap-*")), [])
+
+    def test_streamed_bootstrap_propagates_install_failure_and_cleans_up(self):
+        result, calls = self.run_installer(mode="plugin-fail", bootstrap=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(list(self.directory.glob("playbook-bootstrap-*")), [])
 
 
 if __name__ == "__main__":

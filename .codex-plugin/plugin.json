@@ -1,6 +1,6 @@
 {
   "name": "playbook-testing",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Engineering Playbook testing workflows with executable Codex, Git and CI/CD checks.",
   "author": {
     "name": "JingchaoGu"

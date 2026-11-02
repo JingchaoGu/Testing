@@ -8,27 +8,7 @@
 
 前置条件：Git、Python 3.10+、Codex CLI 已安装并可从终端调用。仓库现已公开，下载不需要 GitHub token。
 
-### 一行安装：curl / irm
-
-Linux / macOS（Bash；启用 pipefail，使下载失败也返回失败）：
-
-```sh
-bash -o pipefail -c 'curl -fsSL https://raw.githubusercontent.com/JingchaoGu/Testing/main/install.sh | sh'
-```
-
-Windows PowerShell（`irm` 是 `Invoke-RestMethod` 的别名）：
-
-```powershell
-irm https://raw.githubusercontent.com/JingchaoGu/Testing/main/install.ps1 -ErrorAction Stop | iex
-```
-
-也可使用 `iwr`（`Invoke-WebRequest`）：
-
-```powershell
-iex ((iwr https://raw.githubusercontent.com/JingchaoGu/Testing/main/install.ps1 -UseBasicParsing -ErrorAction Stop).Content)
-```
-
-根目录引导脚本可直接从管道执行，不依赖本地已克隆的文件。它先下载共享 Python 安装器到临时文件，再运行检查、注册 marketplace 和安装插件；下载或安装失败时返回错误，并清理临时文件。不会自动安装系统依赖或修改 hook 信任记录。
+统一使用 Codex 原生插件命令安装。
 
 ### 快速安装：Windows PowerShell
 
@@ -38,14 +18,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Marketplace registration failed' }
 codex plugin add playbook-testing@testing-playbook
 ```
 
-### 快速安装：Linux
-
-```sh
-codex plugin marketplace add JingchaoGu/Testing --ref main &&
-codex plugin add playbook-testing@testing-playbook
-```
-
-### 快速安装：macOS
+### 快速安装：Linux / macOS
 
 ```sh
 codex plugin marketplace add JingchaoGu/Testing --ref main &&
@@ -54,27 +27,9 @@ codex plugin add playbook-testing@testing-playbook
 
 三平台使用同一个 marketplace 与插件标识。`plugin add` 需要支持该子命令的 CLI；旧版可在注册后到桌面端插件目录的 `Testing Playbook` 来源安装 `Playbook Testing`。参见 [Codex CLI 插件命令](https://learn.chatgpt.com/docs/cli/reference)。
 
-### 带检查与旧版兼容的安装脚本
-
-已克隆或已解压插件包时，可直接运行以下脚本。脚本检查依赖、注册 marketplace，并检测 CLI 是否支持直接安装；不支持时明确提示桌面端安装，失败时保留非零退出码。
-
-Windows PowerShell（从仓库根执行）：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
-```
-
-Linux / macOS（从仓库根执行）：
-
-```sh
-sh ./scripts/install.sh
-```
-
-`ExecutionPolicy Bypass` 仅作用于这一次脚本进程，不修改系统策略。需要源码时先使用 `git clone https://github.com/JingchaoGu/Testing.git`。
-
 安装后在目标项目开启新会话，运行 `$playbook-testing init`，并通过 `/hooks` 审阅并信任当前 hook 定义。Windows hooks 使用 `py -3`，macOS/Linux 使用 `python3`。安装携带 Codex hooks；项目初始化负责测试策略和 Git hooks；远端分支规则与 Codex 信任由各自平台管理。
 
-若此前安装过同名独立 skill，安装器会提示其位置并保留文件；确认新版插件可用后停用旧副本，避免调用到旧版入口。
+若此前安装过同名独立 skill，确认新版插件可用后停用旧副本，避免调用到旧版入口。
 
 使用本地包时，解压生成的 ZIP 后，可将解压出的插件根目录作为本地 marketplace 添加：`codex plugin marketplace add ./playbook-testing`，再执行同一个 `codex plugin add` 命令。
 
@@ -165,6 +120,6 @@ python3 scripts/quality.py verify --stage pr
 python3 scripts/package_plugin.py
 ```
 
-ZIP 默认输出到 `dist/playbook-testing-0.2.0.zip`。包含插件清单、两个 skills、命令路由、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
+ZIP 默认输出到 `dist/playbook-testing-0.2.1.zip`。包含插件清单、两个 skills、命令路由、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
 
-本仓库 CI 在 Linux、Windows 与 macOS 上验证实际提交/推送 hook、安装脚本和失败路径，并构建分发包。它不会部署应用。源自微软 Playbook 的原则均在参考资料中注明；该插件并非微软或 OpenAI 的官方产品。
+本仓库 CI 在 Linux、Windows 与 macOS 上验证实际提交/推送 hook、命令、证据和失败路径，并构建分发包。它不会部署应用。源自微软 Playbook 的原则均在参考资料中注明；该插件并非微软或 OpenAI 的官方产品。

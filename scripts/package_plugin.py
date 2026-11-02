@@ -47,7 +47,7 @@ def validate(root):
 def package(root, output):
     manifest = validate(root)
     output.parent.mkdir(parents=True, exist_ok=True)
-    include = [root / "plugin.json", root / "README.md", root / "install.sh", root / "install.ps1"]
+    include = [root / "plugin.json", root / "README.md"]
     for folder in ("skills", "hooks", "scripts", "templates", "docs", ".codex-plugin", ".agents"):
         include.extend(path for path in (root / folder).rglob("*") if path.is_file()
                        and "__pycache__" not in path.parts and path.suffix not in (".pyc", ".pyo"))
@@ -61,6 +61,6 @@ def package(root, output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/playbook-testing-0.2.0.zip")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/playbook-testing-0.2.1.zip")
     args = parser.parse_args()
     print(package(ROOT, args.output))

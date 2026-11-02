@@ -266,8 +266,6 @@ class RepositoryTests(unittest.TestCase):
             self.assertIn("playbook-testing/hooks/hooks.json", names)
             self.assertIn("playbook-testing/scripts/testing.py", names)
             self.assertIn("playbook-testing/skills/playbook-testing/references/commands.md", names)
-            self.assertIn("playbook-testing/install.sh", names)
-            self.assertIn("playbook-testing/install.ps1", names)
             self.assertIn("playbook-testing/.agents/plugins/marketplace.json", names)
             self.assertTrue(all("/.git/" not in name and "/.testing-results/" not in name and "/__pycache__/" not in name for name in names))
             self.assertNotIn("playbook-testing/.testing-policy.json", names)

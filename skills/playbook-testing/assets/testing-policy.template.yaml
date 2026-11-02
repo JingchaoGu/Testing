@@ -1,0 +1,78 @@
+# 策略模板；不是可直接执行的 runner 配置。
+# 根据仓库发现结果，只复制所需部分；null 表示未配置，绝不代表通过。
+# 各字段由项目脚本/现有工具适配，此技能不附带 YAML 执行器。
+schema_version: 1
+
+checks:
+  build: {kind: command, argv: null}
+  lint: {kind: command, argv: null}
+  typecheck: {kind: command, argv: null}
+  secrets: {kind: command, argv: null}
+  unit: {kind: test, argv: null, min_executed: 1}
+  integration_fast: {kind: test, argv: null, min_executed: 1}
+  integration: {kind: test, argv: null, min_executed: 1}
+  contract: {kind: test, argv: null, min_executed: 1}
+  smoke: {kind: test, argv: null, min_executed: 1}
+  e2e: {kind: test, argv: null, min_executed: 1}
+  ui: {kind: test, argv: null, min_executed: 1}
+  security: {kind: command, argv: null}
+  performance: {kind: test, argv: null, min_executed: 1}
+  recovery: {kind: test, argv: null, min_executed: 1}
+  synthetic: {kind: test, argv: null, min_executed: 1}
+
+# 默认选择建议；项目不适用的检查有理由地移除/替换。
+# conditional 中的条件由项目策略决定，不交给执行中的模型自行豁免。
+stages:
+  edit:
+    mode: feedback
+    snapshot: worktree
+    required: [lint, unit]
+    conditional: [typecheck, integration_fast]
+  task-finish:
+    mode: completion
+    snapshot: worktree
+    required: [lint, unit]
+    conditional: [build, typecheck, integration_fast, contract, ui]
+  commit:
+    mode: local_gate
+    snapshot: index_tree
+    required: [lint, secrets, unit]
+    conditional: [typecheck, integration_fast]
+  push:
+    mode: local_gate
+    snapshot: pushed_refs
+    required: [build, unit]
+    conditional: [integration_fast, contract]
+  pr:
+    mode: server_gate
+    snapshot: merge_candidate
+    required: [build, lint, unit, secrets]
+    conditional: [typecheck, integration, contract, e2e, ui, security]
+  deployed:
+    mode: promotion_gate
+    snapshot: deployed_artifact
+    required: [smoke]
+    conditional: [integration, e2e]
+    ordering: smoke_before_other_checks
+  release:
+    mode: promotion_gate
+    snapshot: release_artifact
+    required: [smoke]
+    conditional: [integration, e2e, ui, security, performance, recovery]
+    manual_conditions: []
+    ordering: smoke_before_other_checks
+  production:
+    mode: monitoring
+    snapshot: deployed_artifact
+    required: [smoke]
+    conditional: [synthetic]
+
+evidence:
+  bind_snapshot_inputs_environment: true
+  preserve_first_failure: true
+  missing_required_is_blocking: true
+  all_skipped_is_not_passed: true
+  not_applicable_requires_reason: true
+  # null 表示沿用项目标准；没有标准时先制定，禁止生成统一百分比。
+  coverage_threshold: null
+  performance_thresholds: null

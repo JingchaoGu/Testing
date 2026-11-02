@@ -1,0 +1,48 @@
+name: Plugin CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.10'
+          - os: windows-latest
+            python: '3.12'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run required checks
+        run: python scripts/quality.py run --stage pr
+      - name: Verify current evidence
+        run: python scripts/quality.py verify --stage pr
+      - name: Build distribution
+        run: python scripts/package_plugin.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: plugin-${{ matrix.os }}
+          path: |
+            .testing-results/
+            dist/
+          include-hidden-files: true
+  gate:
+    if: always()
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful checks on all platforms
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+        run: test "$VERIFY_RESULT" = success

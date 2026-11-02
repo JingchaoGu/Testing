@@ -1,0 +1,39 @@
+name: Playbook Release Gate
+on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: Immutable digest of the already deployed candidate
+        required: true
+      environment:
+        description: Existing deployment environment to validate
+        required: true
+permissions:
+  contents: read
+jobs:
+  verify-candidate:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 30
+    env:
+      TESTING_ARTIFACT: ${{ inputs.artifact }}
+      TESTING_ENVIRONMENT: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # Project commands must verify the actual deployed digest/configuration.
+      # Configure environment approval rules in GitHub; a YAML name is not an approval.
+      - name: Smoke-first deployed checks
+        run: python .testing-tools/quality.py run --stage deployed
+      - name: Smoke-first release checks
+        run: python .testing-tools/quality.py run --stage release
+      - name: Verify release evidence
+        run: python .testing-tools/quality.py verify --stage release
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-evidence
+          path: .testing-results/
+          include-hidden-files: true

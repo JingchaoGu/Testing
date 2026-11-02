@@ -1,0 +1,4 @@
+interface:
+  display_name: "工程测试工作流"
+  short_description: "从微软 Playbook 构建代理、Git 与 CI/CD 分阶段测试门禁"
+  default_prompt: "使用 $playbook-testing 分析当前仓库，建立 AI 编码代理、Git hook 与 CI/CD 的分阶段测试工作流并验证接入结果。"

@@ -1,0 +1,26 @@
+{
+  "description": "Opt-in project testing. Configure .testing-policy.json and review hook trust before use.",
+  "hooks": {
+    "SessionStart": [{"hooks": [{
+      "type": "command",
+      "command": "python3 \"${PLUGIN_ROOT}/scripts/agent_hook.py\"",
+      "command_windows": "py -3 \"${PLUGIN_ROOT}/scripts/agent_hook.py\"",
+      "timeout": 15,
+      "statusMessage": "Loading testing policy"
+    }]}],
+    "PostToolUse": [{"matcher": "Bash|apply_patch|Edit|Write", "hooks": [{
+      "type": "command",
+      "command": "python3 \"${PLUGIN_ROOT}/scripts/agent_hook.py\"",
+      "command_windows": "py -3 \"${PLUGIN_ROOT}/scripts/agent_hook.py\"",
+      "timeout": 120,
+      "statusMessage": "Checking changed code"
+    }]}],
+    "Stop": [{"hooks": [{
+      "type": "command",
+      "command": "python3 \"${PLUGIN_ROOT}/scripts/agent_hook.py\"",
+      "command_windows": "py -3 \"${PLUGIN_ROOT}/scripts/agent_hook.py\"",
+      "timeout": 180,
+      "statusMessage": "Verifying task completion"
+    }]}]
+  }
+}

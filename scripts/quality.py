@@ -249,7 +249,8 @@ def exported_snapshot(repo, treeish):
         raise QualityError("Submodule snapshots are not supported")
     archive = git(repo, "archive", "--format=tar", treeish, binary=True)
     with tempfile.TemporaryDirectory(prefix="playbook-snapshot-") as temporary:
-        target = Path(temporary)
+        # Windows runner TEMP may use an 8.3 alias. Compare canonical paths.
+        target = Path(temporary).resolve()
         with tarfile.open(fileobj=io.BytesIO(archive)) as bundle:
             for member in bundle:
                 destination = (target / member.name).resolve()

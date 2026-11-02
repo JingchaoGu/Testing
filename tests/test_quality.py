@@ -1,4 +1,5 @@
 import io
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -168,6 +169,17 @@ class RepositoryTests(unittest.TestCase):
             self.assertEqual(quality.run(self.repo, "commit")["status"], "passed")
             self.assertEqual(os.environ["GIT_INDEX_FILE"], str(index))
         self.assertEqual(index.read_bytes(), original)
+
+    def test_snapshot_canonicalizes_temporary_directory_alias(self):
+        original = tempfile.TemporaryDirectory
+        @contextmanager
+        def aliased_directory(**kwargs):
+            with original(**kwargs) as path:
+                # The same directory through a noncanonical spelling; also
+                # covers the short/long TEMP alias issue on Windows runners.
+                yield str(Path(path) / ".." / Path(path).name)
+        with patch.object(quality.tempfile, "TemporaryDirectory", side_effect=aliased_directory):
+            self.assertEqual(quality.run(self.repo, "commit")["status"], "passed")
 
     def test_unexpanded_lfs_is_rejected(self):
         (self.repo / "asset.dat").write_text("version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 1\n")

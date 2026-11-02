@@ -94,6 +94,11 @@ def doctor(repo):
             result["git_hooks"][name] = ("absent" if not path.exists() else
                 "playbook wrapper present; execution not verified" if install_git_hooks.MARKER in
                 path.read_text(encoding="utf-8", errors="replace") else "existing hook; inspect its chain")
+    result["github_workflow_files"] = {
+        name: "present; trigger/caller wiring and remote rules need verification" if (repo / path).is_file()
+        else "not generated here; inspect existing CI/CD or complete init"
+        for name, path in (("pr", ".github/workflows/playbook-quality.yml"),
+                           ("delivery", ".github/workflows/playbook-delivery.yml"))}
     return result
 
 

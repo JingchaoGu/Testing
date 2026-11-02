@@ -39,11 +39,13 @@ def setup(repo, github=False):
         repo / ".testing-tools/unittest_junit.py": plugin / "scripts/unittest_junit.py",
         repo / ".testing-tools/install_git_hooks.py": plugin / "scripts/install_git_hooks.py",
         repo / ".testing-tools/testing.py": plugin / "scripts/testing.py",
+        repo / ".testing-tools/delivery_hook.py": plugin / "scripts/delivery_hook.py",
     }
     if not (repo / quality.POLICY).exists():
         copies[repo / quality.POLICY] = plugin / "templates/testing-policy.json"
     if github:
         copies[repo / ".github/workflows/playbook-quality.yml"] = plugin / "templates/ci/github-quality.yml"
+        copies[repo / ".github/workflows/playbook-delivery.yml"] = plugin / "templates/ci/release-gate.yml"
     for destination, source in copies.items():
         if destination.exists() and destination.read_bytes() != source.read_bytes():
             raise quality.QualityError(f"Existing file preserved: {destination}. Review an upgrade manually")
@@ -62,7 +64,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default=".")
     parser.add_argument("--init-git", action="store_true", help="Initialize Git in this exact directory for an explicitly requested new project")
-    parser.add_argument("--github-workflow", action="store_true")
+    parser.add_argument("--github-workflow", action="store_true", help="Add PR/merge-queue and reusable deployed/release/production workflows")
     args = parser.parse_args()
     try:
         for destination in setup(prepare_repository(args.repo, args.init_git), args.github_workflow):

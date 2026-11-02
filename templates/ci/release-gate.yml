@@ -1,12 +1,37 @@
-name: Playbook Release Gate
+name: Playbook Delivery Gate
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
+      stage:
+        description: deployed, release, or production
+        type: string
+        required: true
       artifact:
-        description: Immutable digest of the already deployed candidate
+        description: Immutable ID of the already deployed artifact
+        type: string
         required: true
       environment:
-        description: Existing deployment environment to validate
+        description: Existing environment to validate
+        type: string
+        required: true
+      revision:
+        description: Full commit ID belonging to the deployed artifact
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      stage:
+        type: choice
+        options: [deployed, release, production]
+        required: true
+      artifact:
+        description: Immutable ID of the already deployed artifact
+        required: true
+      environment:
+        description: Existing environment to validate
+        required: true
+      revision:
+        description: Full commit ID belonging to the deployed artifact
         required: true
 permissions:
   contents: read
@@ -16,24 +41,31 @@ jobs:
     environment: ${{ inputs.environment }}
     timeout-minutes: 30
     env:
+      TESTING_STAGE: ${{ inputs.stage }}
       TESTING_ARTIFACT: ${{ inputs.artifact }}
       TESTING_ENVIRONMENT: ${{ inputs.environment }}
+      TESTING_REVISION: ${{ inputs.revision }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      # Project commands must verify the actual deployed digest/configuration.
-      # Configure environment approval rules in GitHub; a YAML name is not an approval.
-      - name: Smoke-first deployed checks
-        run: python .testing-tools/quality.py run --stage deployed
-      - name: Smoke-first release checks
-        run: python .testing-tools/quality.py run --stage release
-      - name: Verify release evidence
-        run: python .testing-tools/quality.py verify --stage release
+      # Add the project's locked dependencies and explicitly scoped probe credentials.
+      # Bind this workflow to the real CD jobs with needs; it does not deploy/publish.
+      # Environment approvals and remote rules must be configured in GitHub.
+      - name: Validate candidate and verify fresh evidence
+        run: >-
+          python .testing-tools/delivery_hook.py
+          --stage "$TESTING_STAGE"
+          --artifact "$TESTING_ARTIFACT"
+          --environment "$TESTING_ENVIRONMENT"
+          --revision "$TESTING_REVISION"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: release-evidence
+          name: delivery-evidence-${{ inputs.stage }}
           path: .testing-results/
           include-hidden-files: true

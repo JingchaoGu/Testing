@@ -6,7 +6,7 @@
 
 ## init
 
-执行 [setup](../../setup/SKILL.md) 的完整接入流程。默认在当前项目映射真实的 edit、task-finish、commit、push 检查，验证后启用项目代理检查并安装 Git pre-commit/pre-push；用户明确排除的阶段不接入。CI 只在用户要求时配置。
+执行 [setup](../../setup/SKILL.md) 的完整接入流程。默认覆盖 edit、task-finish、commit、push、pr、deployed、release、production 的 [阶段接入](../../setup/references/default-hooks.md)，按项目条件完成实际测试、Git/代理开关与 CI/CD 接线；缺少环境或事件时交付具体待接入项。用户明确排除的阶段不接入，不因默认接线而执行真实部署或发布。
 
 先按 [测试动作决策](test-actions.md) 为每个实际模块和交付阶段提出具体动作、理由及用例，形成 TESTING.md（或更新已有同类计划）；再补建所需测试、策略与触发点。不要从现有命令清单反推出项目只需要这些测试，也不要将所有阶段机械映射成 unit。核心阶段用 required_stages 明确记录并检查缺口。
 

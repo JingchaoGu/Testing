@@ -104,6 +104,18 @@ Windows 的安装器把当前解释器绝对路径写入 sh shim；更换解释�
 
 这些阶段必须以命名为 `smoke` 的检查开头，并提供 `TESTING_ENVIRONMENT` 和 `TESTING_ARTIFACT`。命令要核实实际部署的版本与配置；仅填一个字符串不能证明线上运行的就是该版本。
 
-之后按风险配置集成、E2E、性能、恢复等检查。退出码、JUnit 和代码快照规则相同，smoke 失败不执行后续检查。`templates/ci/release-gate.yml` 验证已有候选，不执行部署、流量切换或自动签署。复制模板时按项目调整依赖、时长、环境审批和产物来源。
+之后按风险配置集成、E2E、性能、恢复等检查。退出码、JUnit 和代码快照规则相同，smoke 失败不执行后续检查。init 默认按 [阶段接入](../skills/setup/references/default-hooks.md) 处理这些交付检查；缺真实 CD/环境时保留待接入状态。
+
+GitHub setup 使用 `--github-workflow` 时同时生成 PR 与交付工作流；skill 的 init 会按检测到的平台自动选择该参数。`templates/ci/release-gate.yml` 对应项目 `.github/workflows/playbook-delivery.yml`，通过 workflow_call 接入现有 CD，并提供 workflow_dispatch 手动验证。将真实部署、晋级、生产发布作业与检查通过 needs 串联，不能仅创建文件就认为事件已绑定。
+
+跨平台共享入口：
+
+```sh
+python3 .testing-tools/delivery_hook.py --stage deployed --environment staging --artifact <不可变产物标识> --revision <完整候选commit>
+python3 .testing-tools/delivery_hook.py --stage release --environment staging --artifact <不可变产物标识> --revision <完整候选commit>
+python3 .testing-tools/delivery_hook.py --stage production --environment production --artifact <不可变产物标识> --revision <完整候选commit>
+```
+
+Windows 使用 `py -3`。检查器要求干净的候选 checkout，核对传入版本与 HEAD，绑定环境和产物并复核新鲜证据；release 先确认 deployed，失败时不运行 release。项目探针仍须核实环境实际运行的产物/版本。它不部署、切流或签署。按项目配置锁定依赖、所需探针凭据、超时与环境保护；定时生产监测应从实际产物登记处读取当前版本，不使用默认分支 HEAD 猜测。
 
 PR 模板的最终 `gate` 无论前置作业是否被跳过都会执行，只有前置检查作业成功才通过。还需在仓库规则中将它设置为必需检查；本插件不擅自更改仓库保护策略。

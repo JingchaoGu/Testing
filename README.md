@@ -52,7 +52,7 @@ $playbook-testing hooks status
 $playbook-testing pin check doctor fix
 ```
 
-`init` 支持已有项目和新项目：先分析模块、风险和交付阶段，给出具体测试动作并记录策略，再补建缺失的测试和触发点。空目录会引导选择技术栈与最小功能，创建项目、真实测试和本地 Git，再配置测试命令与 hooks。已经提供的信息不重复询问；上次只生成了空策略时会接续未完成步骤。可以附加“只配置代理 hooks”等范围约束。CI 用 `$playbook-testing ci` 单独接入，或在 init 时明确要求。
+`init` 支持已有项目和新项目：先分析模块、风险和交付阶段，给出具体测试动作并记录策略，再补建缺失的测试和触发点。默认接入代理、Git、PR、部署、发布和生产检查，无需另行要求接 CI/CD。空目录会引导选择技术栈与最小功能，创建项目、真实测试和本地 Git。已经提供的信息不重复询问；上次只生成了空策略时会接续未完成步骤。可以附加“只配置代理 hooks”等范围约束；`ci` 命令用于后续补接或调整。
 
 新项目可以直接给出技术栈与用途：
 
@@ -63,10 +63,23 @@ $playbook-testing init nodejs 创建一个校验待办事项标题的小工具
 
 未提供这些信息时，init 集中询问一次，然后继续完成接入。Python/Node.js 轻量项目可使用运行时自带测试能力；其他技术栈沿用其原生工具。项目代码与测试由代理按需求创建，setup 脚本负责 Git 与测试运行器接入；复制空策略只代表骨架完成。`required_stages` 明确项目核心阶段，doctor 对缺少检查的核心阶段返回非零。实际 hook/CI 触发、远端规则与执行结果分别验证；仅有配置不代表门禁生效。新项目初始化不自动提交或推送代码。
 
+### 默认 hooks
+
+| 阶段 | init 默认配置/接入 | 尚缺条件时 |
+| --- | --- | --- |
+| edit / task-finish | Codex hooks 与项目实际测试开关 | 等待检查、预算和用户信任 |
+| commit / push | Git pre-commit / pre-push，保留已有链路 | 报告检查或管理器接线缺口 |
+| pr | PR/更新/合并队列与最终 CI gate | 报告平台、依赖或 required checks 缺项 |
+| deployed / release / production | 共享交付门禁，绑定实际部署后、晋级前及生产发布后节点 | 生成可接入文件，记录待绑定事件/环境/产物/权限 |
+
+GitHub 项目默认准备 `playbook-quality.yml` 和 `playbook-delivery.yml`；已有其他 CI/CD 时沿原平台接线，新项目未选择平台时说明采用 GitHub Actions 默认文件。交付工作流通过 `workflow_call` 进入真实 CD 依赖链，也支持手动验证候选。release 先检查 deployed，通过后才运行 release；production 验证实际生产候选。检查器绑定完整 commit、干净快照、环境和不可变产物，失败返回非零。
+
+未具备真实部署时，交付检查记录为待接入；init 本身不部署、不发布。文件存在、事件已绑定和实际运行通过分别报告。完整接线规则见 [默认阶段接入](skills/setup/references/default-hooks.md)。
+
 | 命令 | 用途 |
 | --- | --- |
 | 不带参数 | 展示菜单；不自动修改项目 |
-| `init` | 新/旧项目的测试策略、缺失测试建设及 hooks 接入 |
+| `init` | 测试策略与建设，默认接入代理/Git/PR/部署/发布/生产检查 |
 | `plan` | 按模块与风险建议具体测试动作、阶段、触发点和退出条件 |
 | `check [阶段]` | 运行现有检查，默认 task-finish；失败返回失败 |
 | `fix [阶段]` | 读失败证据、最小修复、必要回归并复测 |
@@ -134,6 +147,6 @@ python3 scripts/quality.py verify --stage pr
 python3 scripts/package_plugin.py
 ```
 
-ZIP 默认输出到 `dist/playbook-testing-0.4.0.zip`。包含插件清单、两个 skills、命令路由、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
+ZIP 默认输出到 `dist/playbook-testing-0.5.0.zip`。包含插件清单、两个 skills、命令路由、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
 
 本仓库 CI 在 Linux、Windows 与 macOS 上验证实际提交/推送 hook、命令、证据和失败路径，并构建分发包。它不会部署应用。源自微软 Playbook 的原则均在参考资料中注明；该插件并非微软或 OpenAI 的官方产品。

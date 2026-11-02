@@ -13,6 +13,7 @@ from unittest.mock import patch
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import agent_hook
+import delivery_hook
 import install_git_hooks
 import package_plugin
 import quality
@@ -271,6 +272,67 @@ class RepositoryTests(unittest.TestCase):
         with self.assertRaises(quality.QualityError):
             setup_repo.setup(self.repo)
         self.assertEqual(installed.read_text(), "custom implementation")
+
+    def configure_delivery(self, mode="pass", vendor=False):
+        self.policy["checks"]["smoke"] = dict(self.policy["checks"]["unit"])
+        self.policy["stages"].update(deployed=["smoke"], release=["smoke", "unit"], production=["smoke", "unit"])
+        self.save_policy()
+        self.mode(mode)
+        if vendor:
+            setup_repo.setup(self.repo, github=True)
+        self.git("add", "--all")
+        self.git("commit", "--quiet", "-m", "delivery fixture")
+        return quality.git(self.repo, "rev-parse", "HEAD")
+
+    def test_delivery_release_validates_deployed_first_and_restores_context(self):
+        revision = self.configure_delivery()
+        with patch.dict(os.environ, TESTING_ENVIRONMENT="original", TESTING_ARTIFACT="old"):
+            result = delivery_hook.run_delivery(self.repo, "release", "fixture-staging", "fixture-artifact", revision)
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual([item["stage"] for item in result["checks"]], ["deployed", "release"])
+            self.assertTrue(all(item["verified"] for item in result["checks"]))
+            self.assertEqual(os.environ["TESTING_ENVIRONMENT"], "original")
+            self.assertEqual(os.environ["TESTING_ARTIFACT"], "old")
+        record = json.loads((self.repo / quality.RESULTS / "release.json").read_text())
+        self.assertEqual((record["environment"], record["artifact"]), ("fixture-staging", "fixture-artifact"))
+
+    def test_delivery_failure_stops_release_promotion_checks(self):
+        revision = self.configure_delivery(mode="fail")
+        result = delivery_hook.run_delivery(self.repo, "release", "fixture-staging", "fixture-artifact", revision)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual([item["stage"] for item in result["checks"]], ["deployed"])
+        self.assertFalse((self.repo / quality.RESULTS / "release.json").exists())
+
+    def test_delivery_rejects_wrong_revision_dirty_source_and_missing_context(self):
+        revision = self.configure_delivery()
+        for environment, artifact, expected in (("", "artifact", revision), ("staging", " ", revision),
+                                                  ("staging", "artifact", "0" * 40), ("staging", "artifact", "main")):
+            with self.assertRaises(quality.QualityError):
+                delivery_hook.run_delivery(self.repo, "deployed", environment, artifact, expected)
+        self.mode("changed after checkout")
+        with self.assertRaises(quality.QualityError):
+            delivery_hook.run_delivery(self.repo, "deployed", "staging", "artifact", revision)
+        self.assertFalse((self.repo / quality.RESULTS).exists())
+
+    def test_vendored_production_hook_propagates_failure(self):
+        revision = self.configure_delivery(mode="fail", vendor=True)
+        result = subprocess.run([sys.executable, str(self.repo / ".testing-tools/delivery_hook.py"),
+            "--stage", "production", "--environment", "fixture-production", "--artifact", "fixture-artifact",
+            "--revision", revision, "--repo", str(self.repo)], capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["status"], "failed")
+        self.assertTrue((self.repo / ".github/workflows/playbook-quality.yml").is_file())
+        self.assertTrue((self.repo / ".github/workflows/playbook-delivery.yml").is_file())
+
+    def test_default_workflow_copy_preserves_existing_delivery_pipeline(self):
+        path = self.repo / ".github/workflows/playbook-delivery.yml"
+        path.parent.mkdir(parents=True)
+        path.write_text("existing pipeline", encoding="utf-8")
+        with self.assertRaises(quality.QualityError):
+            setup_repo.setup(self.repo, github=True)
+        self.assertEqual(path.read_text(), "existing pipeline")
+        self.assertFalse((path.parent / "playbook-quality.yml").exists())
+        self.assertFalse((self.repo / ".testing-tools").exists())
 
     def test_distribution_has_runtime_and_no_project_data(self):
         import zipfile

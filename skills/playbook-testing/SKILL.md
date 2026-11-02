@@ -17,7 +17,7 @@ description: "依据 Microsoft Engineering Playbook，为新项目和已有项�
 
 | 命令 | 作用 |
 | --- | --- |
-| `init` | 新/旧项目的测试策略、缺失测试建设及 hooks 接入；CI 按需接入 |
+| `init` | 测试策略与建设，默认接入代理/Git/PR/部署/发布/生产检查 |
 | `plan` | 按模块和风险给出具体测试动作、阶段与退出条件 |
 | `check [阶段]` | 运行既有阶段，默认 task-finish |
 | `fix [阶段]` | 定位失败、最小修复、补回归并复测 |

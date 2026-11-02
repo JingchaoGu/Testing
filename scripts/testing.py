@@ -34,6 +34,7 @@ def agent_issues(policy):
 
 
 def hooks(repo, action):
+    repo = repo.resolve()
     policy = quality.load_policy(repo)
     if action == "on":
         issues = agent_issues(policy)
@@ -107,6 +108,7 @@ do not invent a passing result or download and execute a replacement.
 
 
 def shortcuts(repo, commands, remove=False):
+    repo = repo.resolve()
     paths = []
     for command in dict.fromkeys(commands):
         if command not in COMMANDS:

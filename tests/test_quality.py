@@ -375,6 +375,15 @@ class RepositoryTests(unittest.TestCase):
             testing.hooks(self.repo, "off")
         self.assertEqual(json.loads(target.read_text())["agent_hooks"], True)
 
+    def test_project_path_aliases_are_canonicalized_before_boundary_checks(self):
+        (self.repo / "subdir").mkdir()
+        alias = self.repo / "subdir" / ".."
+        self.assertFalse(testing.hooks(alias, "off")["agent_hooks"])
+        testing.shortcuts(alias, ["check"])
+        self.assertTrue((self.repo / ".agents/skills/pt-check/SKILL.md").is_file())
+        testing.shortcuts(alias, ["check"], remove=True)
+        self.assertFalse((self.repo / ".agents/skills/pt-check/SKILL.md").exists())
+
     def test_unittest_report_handles_subtest_and_class_setup_errors(self):
         directory = self.repo / "isolated-tests"
         directory.mkdir()

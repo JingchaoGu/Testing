@@ -2,9 +2,9 @@
 
 ## JSON 策略
 
-执行器在 Git 仓库根读取 `.testing-policy.json`；它与技能中的概念性 YAML 模板不是同一个运行格式。setup 初始配置为空，任何空阶段都会拒绝执行，避免假绿。
+唯一运行配置为 Git 仓库根的 `.testing-policy.json`。setup 初始配置为空，任何空阶段都会拒绝执行，避免假绿。
 
-聊天中的 `$playbook-testing init` 可从空目录引导创建项目；已知技术栈和用途时继续创建真实代码与测试，否则集中询问一次。底层 setup 仅在显式传入 `--init-git` 时创建本地 Git，且不会在已有父仓库中创建嵌套仓库。复制空策略属于未完成状态，doctor 会报告缺少可执行阶段，代理 hooks 不能启用。详见 [新项目初始化](../skills/setup/references/new-project.md)。
+聊天中的 `$playbook-testing init` 可从空目录引导创建项目；已知技术栈和用途时继续创建真实代码与测试，否则集中询问一次。底层 setup 仅在显式传入 `--init-git` 时创建本地 Git，且不会在已有父仓库中创建嵌套仓库。复制空策略属于未完成状态，doctor 会报告缺少可执行阶段，代理 hooks 不能启用。详见 [新项目初始化](../skills/playbook-testing/references/new-project.md)。
 
 setup 保留 .gitignore 原内容，并补齐 `.testing-results/` 与 `__pycache__/`，避免报告及 Python 运行缓存被当作源代码变化；项目的构建产物、依赖目录等仍按自身技术栈配置忽略规则。
 
@@ -66,6 +66,10 @@ python3 .testing-tools/testing.py pin check doctor
 python3 .testing-tools/testing.py unpin check doctor
 ```
 
+以上是项目独立运行器入口；诊断当前插件优先使用安装插件的 scripts/testing.py，尤其是升级后仍保留旧 vendor 的项目。使用 `hooks status` 或 `doctor --runtime` 只读查询 Codex 原生登记/信任，可传 `--codex <当前宿主CLI>`。输出包含 CLI 路径/版本，避免把 PATH 中另一版本的结果当作桌面宿主状态。
+
+项目开关为 true 且原生状态不是 trusted 时，hooks status 返回非零，automatic_checks 为 pending；on/off 成功仅表示开关设置完成。用户在同一 Codex 的 /hooks 审阅，诊断不会自动信任或弹出批准。实际收到的事件保存在 `.testing-results/last-hook-event.json`，origin=direct 代表手工调用处理器，不能据此声称原生派发已验证。
+
 Windows 将 `python3` 换成 `py -3`。这些命令支持 `--repo <仓库>`；doctor 只读，不运行测试，配置错误返回非零，也不推断 Codex 信任或远端保护。hooks on/off 只改项目 agent_hooks，保留其他字段；on 要求 edit/task-finish 非空、超时总和分别不超过 100/150 秒，为事件开销留出余量。status 不写文件。pin 的快捷 skill 仅写当前项目 `.agents/skills/pt-<命令>/SKILL.md`，冲突或链接路径拒绝变更；unpin 保留用户修改和目录中其他文件。
 
 聊天中的 `$playbook-testing init/plan/fix/ci/release` 是代理工作流，不是终端子命令。check push 需要真实 Git ref 输入，因此终端 check 不以 HEAD 模拟；使用 pre-push 接入执行。
@@ -104,7 +108,7 @@ Windows 的安装器把当前解释器绝对路径写入 sh shim；更换解释�
 
 这些阶段必须以命名为 `smoke` 的检查开头，并提供 `TESTING_ENVIRONMENT` 和 `TESTING_ARTIFACT`。命令要核实实际部署的版本与配置；仅填一个字符串不能证明线上运行的就是该版本。
 
-之后按风险配置集成、E2E、性能、恢复等检查。退出码、JUnit 和代码快照规则相同，smoke 失败不执行后续检查。init 默认按 [阶段接入](../skills/setup/references/default-hooks.md) 处理这些交付检查；缺真实 CD/环境时保留待接入状态。
+之后按风险配置集成、E2E、性能、恢复等检查。退出码、JUnit 和代码快照规则相同，smoke 失败不执行后续检查。init 默认按 [阶段接入](../skills/playbook-testing/references/default-hooks.md) 处理这些交付检查；缺真实 CD/环境时保留待接入状态。
 
 GitHub setup 使用 `--github-workflow` 时同时生成 PR 与交付工作流；skill 的 init 会按检测到的平台自动选择该参数。`templates/ci/release-gate.yml` 对应项目 `.github/workflows/playbook-delivery.yml`，通过 workflow_call 接入现有 CD，并提供 workflow_dispatch 手动验证。将真实部署、晋级、生产发布作业与检查通过 needs 串联，不能仅创建文件就认为事件已绑定。
 

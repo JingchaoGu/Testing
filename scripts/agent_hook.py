@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from datetime import datetime, timezone
 
 import quality
 
@@ -35,6 +36,11 @@ def handle(event):
         if policy.get("agent_hooks") is not True:
             return {}
         snapshot = quality.fingerprint(repo)
+        quality.write_json(repo / quality.RESULTS / "last-hook-event.json", {
+            "event": name, "session_id": event.get("session_id"),
+            "received_at": datetime.now(timezone.utc).isoformat(),
+            "origin": "plugin" if os.environ.get("PLUGIN_ROOT") else "direct",
+            "snapshot": snapshot})
         path = state_path(repo, event)
         try:
             state = json.loads(path.read_text(encoding="utf-8"))

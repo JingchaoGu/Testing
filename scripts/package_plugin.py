@@ -10,24 +10,23 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def validate(root):
-    manifest = json.loads((root / "plugin.json").read_text(encoding="utf-8"))
+    manifest = json.loads((root / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+    if (root / "plugin.json").exists():
+        raise ValueError("Use one native Codex manifest; a second portable manifest can mask hooks on supported Codex versions")
     extension = manifest["extensions"]["com.openai"]
-    compatibility = root / ".codex-plugin/plugin.json"
-    if compatibility.exists():
-        fallback = json.loads(compatibility.read_text(encoding="utf-8"))
-        if any(fallback.get(key) != manifest.get(key) for key in ("name", "version", "description")) or fallback.get("hooks") != extension["hooks"]:
-            raise ValueError("Compatibility manifest is out of sync")
-    for value in (extension["hooks"], extension["onboardingSkill"]):
+    for value in ("./hooks/hooks.json", extension["onboardingSkill"]):
         path = (root / value).resolve()
         if not value.startswith("./") or not path.is_relative_to(root.resolve()) or not path.is_file():
             raise ValueError(f"Invalid plugin path: {value}")
-    hooks = json.loads((root / extension["hooks"]).read_text(encoding="utf-8"))
+    hooks = json.loads((root / "hooks/hooks.json").read_text(encoding="utf-8"))
     if set(hooks["hooks"]) != {"SessionStart", "PostToolUse", "Stop"}:
         raise ValueError("Unexpected hook event inventory")
     for groups in hooks["hooks"].values():
         for group in groups:
             for handler in group["hooks"]:
-                for field in ("command", "command_windows"):
+                if "command_windows" in handler:
+                    raise ValueError("JSON hooks require commandWindows, not the TOML command_windows key")
+                for field in ("command", "commandWindows"):
                     for target in re.findall(r"\$\{PLUGIN_ROOT\}/([^\"]+)", handler[field]):
                         if not (root / target).is_file():
                             raise ValueError(f"Missing hook script: {target}")
@@ -47,7 +46,7 @@ def validate(root):
 def package(root, output):
     manifest = validate(root)
     output.parent.mkdir(parents=True, exist_ok=True)
-    include = [root / "plugin.json", root / "README.md"]
+    include = [root / "README.md"]
     for folder in ("skills", "hooks", "scripts", "templates", "docs", ".codex-plugin", ".agents"):
         include.extend(path for path in (root / folder).rglob("*") if path.is_file()
                        and "__pycache__" not in path.parts and path.suffix not in (".pyc", ".pyo"))
@@ -61,6 +60,6 @@ def package(root, output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/playbook-testing-0.5.0.zip")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/playbook-testing-0.6.0.zip")
     args = parser.parse_args()
     print(package(ROOT, args.output))

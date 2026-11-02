@@ -340,7 +340,7 @@ class RepositoryTests(unittest.TestCase):
         package_plugin.package(SCRIPTS.parent, target)
         with zipfile.ZipFile(target) as archive:
             names = archive.namelist()
-            self.assertIn("playbook-testing/plugin.json", names)
+            self.assertIn("playbook-testing/.codex-plugin/plugin.json", names)
             self.assertIn("playbook-testing/hooks/hooks.json", names)
             self.assertIn("playbook-testing/scripts/testing.py", names)
             self.assertIn("playbook-testing/skills/playbook-testing/references/commands.md", names)
@@ -455,6 +455,27 @@ class LabelTests(unittest.TestCase):
                     testing.hooks(self.repo, "on")
                 self.assertEqual((self.repo / quality.POLICY).read_bytes(), before)
                 self.policy["stages"][stage] = ["unit"]
+
+    def test_hook_status_and_runtime_doctor_do_not_treat_opt_in_as_trust(self):
+        for arguments in (("hooks", "status"), ("doctor", "--runtime")):
+            with self.subTest(arguments=arguments), patch.object(sys, "argv", ["testing.py", *arguments, "--repo", str(self.repo)]), \
+                    patch.object(testing.codex_hooks, "inspect", return_value={"status": "review-required"}), \
+                    patch.object(sys, "stdout", new_callable=io.StringIO) as output:
+                self.assertEqual(testing.main(), 1)
+                report = json.loads(output.getvalue())
+                self.assertTrue(report["agent_hooks"])
+                self.assertEqual(report["codex"]["status"], "review-required")
+                if arguments[0] == "hooks":
+                    self.assertEqual(report["automatic_checks"], "pending")
+                else:
+                    self.assertTrue(report["issues"])
+        self.policy["stages"]["edit"] = []
+        self.save_policy()
+        with patch.object(sys, "argv", ["testing.py", "hooks", "status", "--repo", str(self.repo)]), \
+                patch.object(testing.codex_hooks, "inspect", return_value={"status": "trusted"}), \
+                patch.object(sys, "stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(testing.main(), 1)
+            self.assertEqual(json.loads(output.getvalue())["automatic_checks"], "pending")
 
     def test_doctor_is_read_only_and_does_not_claim_stale_evidence_passes(self):
         quality.run(self.repo, "pr")
@@ -600,6 +621,14 @@ class SetupError(unittest.TestCase):
         self.save_policy()
         self.mode("fail")
         self.assertEqual(agent_hook.handle(self.event("Stop")), {})
+
+    def test_direct_handler_receipt_does_not_claim_native_dispatch(self):
+        with patch.dict(os.environ, {"PLUGIN_ROOT": ""}):
+            agent_hook.handle(self.event("SessionStart"))
+        report = testing.doctor(self.repo)
+        self.assertEqual(report["last_hook_event"]["origin"], "direct")
+        self.assertEqual(report["last_hook_event"]["event"], "SessionStart")
+        self.assertEqual(report["codex"]["status"], "not-inspected")
 
     def test_agent_red_feedback_and_bounded_stop_continuation(self):
         agent_hook.handle(self.event("SessionStart"))

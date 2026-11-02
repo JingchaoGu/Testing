@@ -1,18 +1,14 @@
 # Playbook Testing — Codex Plugin
 
-依据微软 ISE Engineering Playbook，为项目各部分选择测试动作、补建测试，并通过 **Codex hooks + Git hooks + CI/CD 门禁**在适当阶段执行。执行器需要 Python 3.10+ 和 Git，只使用标准库；仓库默认不启用代理自动执行。
+依据微软 ISE Engineering Playbook，按项目模块、风险和交付阶段选择测试动作，补建缺失测试，再接入 **Codex hooks、Git hooks 与 CI/CD 门禁**。已有测试用于发现和补齐缺口；新项目先建立验收标准与真实测试。
 
-核心流程：验收标准 → 用例与风险 → 开发快速反馈 → 提交/推送检查 → PR 门禁 → 部署后冒烟 → 发布验证 → 生产缺陷回归。
+流程：验收标准 → 风险与用例 → 开发反馈 → 提交/推送检查 → PR 门禁 → 部署后冒烟 → 发布验证 → 生产回归。测试动作、check ID、触发阶段和待接入条件记录在项目 `TESTING.md` 或已有测试计划中。
 
-skill 先回答“这个模块要证明什么、采用哪类测试、在哪个阶段运行”，再建设测试及 hook 接线。已有测试是输入；新项目同样会得到单元、集成、契约、UI/E2E、安全、性能与恢复等适用动作的建议，明确当前实施、待接入和不适用的部分。项目策略落在 `TESTING.md` 或已有同类计划中，并关联实际检查 ID、阶段和触发位置。详见 [测试动作决策](skills/playbook-testing/references/test-actions.md)。
+## 安装
 
-## 安装与分享
+需要 Git、Python 3.10+ 和支持插件命令的 Codex CLI。统一使用原生插件命令，三平台使用同一来源和插件标识。
 
-前置条件：Git、Python 3.10+、Codex CLI 已安装并可从终端调用。仓库现已公开，下载不需要 GitHub token。
-
-统一使用 Codex 原生插件命令安装。
-
-### 快速安装：Windows PowerShell
+Windows PowerShell：
 
 ```powershell
 codex plugin marketplace add JingchaoGu/Testing --ref main
@@ -20,133 +16,88 @@ if ($LASTEXITCODE -ne 0) { throw 'Marketplace registration failed' }
 codex plugin add playbook-testing@testing-playbook
 ```
 
-### 快速安装：Linux / macOS
+Linux / macOS：
 
 ```sh
 codex plugin marketplace add JingchaoGu/Testing --ref main &&
 codex plugin add playbook-testing@testing-playbook
 ```
 
-三平台使用同一个 marketplace 与插件标识。`plugin add` 需要支持该子命令的 CLI；旧版可在注册后到桌面端插件目录的 `Testing Playbook` 来源安装 `Playbook Testing`。参见 [Codex CLI 插件命令](https://learn.chatgpt.com/docs/cli/reference)。
+安装或更新后，在目标项目开启新会话并运行 `$playbook-testing init`。Windows hooks 使用 `py -3`，Linux/macOS 使用 `python3`。曾安装同名独立 skill 时应停用旧副本，避免遮蔽插件入口。
 
-安装后在目标项目开启新会话，运行 `$playbook-testing init`，并通过 `/hooks` 审阅并信任当前 hook 定义。Windows hooks 使用 `py -3`，macOS/Linux 使用 `python3`。安装携带 Codex hooks；项目初始化负责测试策略和 Git hooks；远端分支规则与 Codex 信任由各自平台管理。
+### Hook 信任
 
-若此前安装过同名独立 skill，确认新版插件可用后停用旧副本，避免调用到旧版入口。
+与 [Impeccable](https://github.com/pbakaus/impeccable) 一样，使用 `.codex-plugin/plugin.json`、默认 `hooks/hooks.json` 和统一 skill 命令。**安装插件与项目启用均不授予 hook 信任**；用户需在同一 Codex 的 `/hooks` 审阅 Playbook Testing。没有受支持的自动批准接口，skill 不写入信任记录。机制见 [Codex Hooks](https://learn.chatgpt.com/docs/hooks)。
 
-使用本地包时，解压生成的 ZIP 后，可将解压出的插件根目录作为本地 marketplace 添加：`codex plugin marketplace add ./playbook-testing`，再执行同一个 `codex plugin add` 命令。
+`$playbook-testing hooks status` 通过原生只读接口核实发现/信任状态，输出所用 CLI 路径与版本。PATH 指向另一版本时，诊断脚本可用 `--codex <当前宿主的可执行文件>`。未发现应先排查加载；待信任应完成用户审阅；无法查询则明确报告未知。项目开关开启但原生状态未确认时返回非零。
 
-目前带生命周期 hooks 的插件适合 Codex 桌面端手动安装/本地或团队分发，不能直接提交公共插件目录。hooks 需要本地执行环境及用户信任；云端编排不保证运行这些脚本。参见 [OpenAI 打包说明](https://developers.openai.com/plugins/build/plugins) 和 [Hooks](https://learn.chatgpt.com/docs/hooks)。
+版本 0.6.0 修复旧包“skill 可加载、原生 hooks 为零”的打包兼容问题，并改用 JSON 的 `commandWindows` 字段。使用当前宿主复核后，才报告 hooks 已登记。`.testing-results/last-hook-event.json` 记录处理器收到的事件；`origin=direct` 的手工调用不证明 Codex 派发。
 
-## 命令使用流程
+## 使用
 
-采用与 [Impeccable](https://github.com/pbakaus/impeccable) 类似的“安装 → 初始化 → 统一命令 → 可选快捷入口”流程。在 Codex 聊天中调用：
+只有一个主 skill，`setup` 已合并进 `init`：
 
 ```text
 $playbook-testing init
 $playbook-testing plan
-$playbook-testing check
 $playbook-testing check pr
 $playbook-testing fix
-$playbook-testing doctor
+$playbook-testing doctor --runtime
 $playbook-testing hooks status
 $playbook-testing pin check doctor fix
 ```
 
-`init` 支持已有项目和新项目：先分析模块、风险和交付阶段，给出具体测试动作并记录策略，再补建缺失的测试和触发点。默认接入代理、Git、PR、部署、发布和生产检查，无需另行要求接 CI/CD。空目录会引导选择技术栈与最小功能，创建项目、真实测试和本地 Git。已经提供的信息不重复询问；上次只生成了空策略时会接续未完成步骤。可以附加“只配置代理 hooks”等范围约束；`ci` 命令用于后续补接或调整。
-
-新项目可以直接给出技术栈与用途：
-
-```text
-$playbook-testing init python 创建一个将标签去空格、转小写并去重的工具
-$playbook-testing init nodejs 创建一个校验待办事项标题的小工具
-```
-
-未提供这些信息时，init 集中询问一次，然后继续完成接入。Python/Node.js 轻量项目可使用运行时自带测试能力；其他技术栈沿用其原生工具。项目代码与测试由代理按需求创建，setup 脚本负责 Git 与测试运行器接入；复制空策略只代表骨架完成。`required_stages` 明确项目核心阶段，doctor 对缺少检查的核心阶段返回非零。实际 hook/CI 触发、远端规则与执行结果分别验证；仅有配置不代表门禁生效。新项目初始化不自动提交或推送代码。
-
-### 默认 hooks
-
-| 阶段 | init 默认配置/接入 | 尚缺条件时 |
-| --- | --- | --- |
-| edit / task-finish | Codex hooks 与项目实际测试开关 | 等待检查、预算和用户信任 |
-| commit / push | Git pre-commit / pre-push，保留已有链路 | 报告检查或管理器接线缺口 |
-| pr | PR/更新/合并队列与最终 CI gate | 报告平台、依赖或 required checks 缺项 |
-| deployed / release / production | 共享交付门禁，绑定实际部署后、晋级前及生产发布后节点 | 生成可接入文件，记录待绑定事件/环境/产物/权限 |
-
-GitHub 项目默认准备 `playbook-quality.yml` 和 `playbook-delivery.yml`；已有其他 CI/CD 时沿原平台接线，新项目未选择平台时说明采用 GitHub Actions 默认文件。交付工作流通过 `workflow_call` 进入真实 CD 依赖链，也支持手动验证候选。release 先检查 deployed，通过后才运行 release；production 验证实际生产候选。检查器绑定完整 commit、干净快照、环境和不可变产物，失败返回非零。
-
-未具备真实部署时，交付检查记录为待接入；init 本身不部署、不发布。文件存在、事件已绑定和实际运行通过分别报告。完整接线规则见 [默认阶段接入](skills/setup/references/default-hooks.md)。
-
 | 命令 | 用途 |
 | --- | --- |
-| 不带参数 | 展示菜单；不自动修改项目 |
-| `init` | 测试策略与建设，默认接入代理/Git/PR/部署/发布/生产检查 |
-| `plan` | 按模块与风险建议具体测试动作、阶段、触发点和退出条件 |
-| `check [阶段]` | 运行现有检查，默认 task-finish；失败返回失败 |
-| `fix [阶段]` | 读失败证据、最小修复、必要回归并复测 |
-| `doctor` | 只读检查配置与证据，明确尚未核实的信任/远端规则 |
-| `hooks status/on/off` | 查看/切换当前项目的代理检查，不删除 Git hooks |
-| `ci` | 复用测试策略接入 PR/合并队列及汇总 gate |
-| `release` | 验证已有部署候选，先 smoke；不执行部署或代替审批 |
-| `pin/unpin <命令...>` | 注册/移除 `$pt-check` 等项目快捷 skill |
+| 无参数 | 展示菜单和配置状态 |
+| `init` | 制定策略、补建测试并默认处理各阶段接入 |
+| `plan` | 按模块/风险提出具体用例、测试层次、阶段与退出条件 |
+| `check [阶段]` | 运行真实检查；默认 task-finish |
+| `fix [阶段]` | 根据失败证据最小修复、补回归并复测 |
+| `doctor [--runtime]` | 静态配置诊断；runtime 额外查询原生 hooks |
+| `hooks status/on/off` | 核实状态或切换当前项目 opt-in，保留 Git hooks |
+| `pin/unpin <命令...>` | 注册/移除项目 `$pt-check` 等快捷 skill |
 
-pin 后可以调用 `$pt-check pr`、`$pt-doctor`、`$pt-fix`。快捷入口写入 `.agents/skills/pt-<命令>/SKILL.md`，可提交给团队共享；重复 pin 不改同样内容，同名外部 skill、用户修改及链接目录会被保留。unpin 仅删除生成且未被修改的文件。技能列表未刷新时开启新会话。
+`ci` 是 init 的 CI/CD 范围快捷入口；`release` 复用 check release。它们没有独立的重复流程。`$playbook-testing` 和 `$pt-check` 是 skill 调用，不是 shell 程序或新增内置斜杠命令。快捷入口写在项目 `.agents/skills/`，保留外部或用户修改的文件。
 
-`$playbook-testing` 与 `$pt-check` 是 **Codex skill 调用**，不是 shell 命令或新增的 Codex 内置斜杠命令。`init/plan/fix/ci/release` 由代理结合项目完成；执行器不会凭空产生测试或验收结论。参见 [Skills 调用方式](https://learn.chatgpt.com/docs/build-skills)。
+空目录先确认技术栈和最小功能，再创建代码、真实测试及本地 Git；已提供的信息不重复询问。仅生成空策略不算完成初始化。初始化不自动提交、推送或部署。详见 [初始化](skills/playbook-testing/references/init.md) 与 [测试动作决策](skills/playbook-testing/references/test-actions.md)。
 
-## 终端与项目接入
+## 默认阶段
 
-手工接入或接入其他自动化时：
+| 阶段 | 默认接入 | 生效条件 |
+| --- | --- | --- |
+| edit / task-finish | Codex PostToolUse / Stop；SessionStart 加载上下文 | 实际检查、预算、项目 opt-in、原生发现和用户信任 |
+| commit / push | Git pre-commit / pre-push，保留已有链路 | 实际 index / 各候选 commit 的独立快照检查 |
+| pr | PR、更新、合并队列和最终 gate | 实际 CI 作业及服务端 required checks |
+| deployed / release / production | 真实部署后、晋级前和生产发布后检查 | CD 调用、环境、完整 commit、不可变产物及权限 |
 
-```sh
-python3 /path/to/Testing/scripts/setup_repo.py --repo /path/to/project --github-workflow
-# 编辑项目 .testing-policy.json，填写真实命令和所需阶段。
-python3 /path/to/project/.testing-tools/testing.py check --repo /path/to/project --stage pr
-python3 /path/to/project/.testing-tools/testing.py hooks on --repo /path/to/project
-python3 /path/to/project/.testing-tools/install_git_hooks.py --repo /path/to/project
-python3 /path/to/project/.testing-tools/testing.py doctor --repo /path/to/project
-python3 /path/to/project/.testing-tools/testing.py pin check doctor --repo /path/to/project
-```
+GitHub 默认准备 `playbook-quality.yml` 和可复用的 `playbook-delivery.yml`；已有其他平台沿原机制接线。release 先验证 deployed，通过后才运行 release。没有真实 CD/环境时，交付可接入文件并记录具体待绑定条件。文件存在、实际触发和执行通过分别报告，见 [默认阶段接入](skills/playbook-testing/references/default-hooks.md)。
 
-Windows 将 `python3` 换成 `py -3`。接入工具只写项目本地文件；遇到不同内容的已有文件或自定义 Git hook 管理器会保留并提示人工合并。
+edit 仅用于快速反馈，允许 TDD 暂时失败；task-finish 验证本地完成，失败最多自动请求一次修复。edit/task-finish 配置超时总和上限分别为 100/150 秒；长测进入 Git/CI。Git 本地 hooks 可绕过，正式合并与发布依赖服务端规则和环境审批。
 
-新项目目录已有明确技术栈和用途时，创建相应代码与测试，再给 setup 增加 `--init-git`。它仅在指定目录创建本地 Git，目标位于其他父仓库内时拒绝操作；默认不加此参数会保留原有 Git 前置条件。详细步骤见 [新项目初始化](skills/setup/references/new-project.md)。
+## 运行器与证据
 
-设置 `agent_hooks: true` 且信任定义后才启用该项目的代理测试。`hooks on` 验证 edit/task-finish 非空且配置超时总和分别不超过 100/150 秒，给事件超时留出余量；长测放入 Git/CI。`edit` 用于快速反馈，允许 TDD 的暂时失败；`task-finish` 在结束时检查。失败最多自动请求一次继续修复，仍失败则要求明确报告未验证，不把结果改成通过。
+skill 的管理/诊断使用当前安装插件 `scripts/testing.py`；项目 Git/CI 使用 `.testing-tools/` 中的独立副本，升级时保留项目定制。手工接入入口为 `scripts/setup_repo.py --repo <项目> [--init-git] [--github-workflow]`；实际运行配置只有 `.testing-policy.json`。
 
-## 已实现能力
+阶段名：`edit`、`task-finish`、`commit`、`push`、`pr`、`deployed`、`release`、`production`。push 必须使用 Git pre-push 的真实 stdin refs。环境阶段经 delivery_hook 绑定真实候选；不接受缺失的环境和产物。
 
-| 入口 | 行为 |
-| --- | --- |
-| Codex `SessionStart` | 加载项目测试上下文，不自动建立测试策略 |
-| Codex `PostToolUse` | 文件快照改变后运行 edit；重复无变更事件不重复测试 |
-| Codex `Stop` | 验证本次会话改动的 task-finish，防止无限继续 |
-| Git pre-commit | 导出真实 index tree 测试，保留未暂存修改与未跟踪文件 |
-| Git pre-push | 从 stdin 读取全部 ref，验证每个不同候选 commit，处理新分支和删除 |
-| PR/合并队列 | 运行项目必需检查；验证同一代码快照的报告，汇总作业必须成功 |
-| 部署/发布/生产阶段 | 必须先 smoke；要求环境和产物标识；失败停止后续检查 |
+`.testing-results/` 保存每轮日志、JUnit、证据与阶段记录，应保持 Git 忽略。失败、零测试、全跳过、缺报告、超时或验证中输入改变都不能通过；先保留首次失败再修复。配置、JUnit 和 JSON 均不构成防篡改证明。
 
-共享入口：`quality.py run --stage STAGE`。阶段名为 `edit`、`task-finish`、`commit`、`push`、`pr`、`deployed`、`release`、`production`。push 由 `quality.py git-hook pre-push` 读取 Git 的 ref 输入。
+- [配置](docs/configuration.md)
+- [Playbook 原则与来源](skills/playbook-testing/references/core-model.md)
+- [代理 hooks 排障](skills/playbook-testing/references/agent-hooks.md)
+- [信任边界与限制](docs/limitations.md)
 
-结果写入项目 `.testing-results/`：每轮独立目录、命令日志、JUnit、证据 JSON，以及阶段最新记录。测试失败、零测试、全跳过、报告缺失、超时或输入在验证中发生变化都不能通过。先保留首次失败，再进行有界修复和复测。结果目录应保持 Git 忽略。
-
-## 配置、验证和限制
-
-- [命令与阶段配置](docs/configuration.md)
-- [按模块和交付阶段选择测试动作](skills/playbook-testing/references/test-actions.md)
-- [Playbook 原则、适配决策与来源](skills/playbook-testing/references/core-model.md)
-- [信任边界与已知限制](docs/limitations.md)
-
-本插件提供执行和证据，不自动保证用例充分、业务验收正确或生产安全。Git 本地 hooks 可绕过；正式合并依赖服务端 required check，发布审批依赖项目环境规则。模板不包含真实业务部署、压力实验或生产探针，需按项目风险接入其实际命令。
-
-## 开发与打包
+## 开发与分享
 
 ```sh
-python3 -m unittest discover -s tests -v
 python3 scripts/quality.py run --stage pr
 python3 scripts/quality.py verify --stage pr
 python3 scripts/package_plugin.py
 ```
 
-ZIP 默认输出到 `dist/playbook-testing-0.5.0.zip`。包含插件清单、两个 skills、命令路由、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
+默认输出 `dist/playbook-testing-0.6.0.zip`，包含一个主 skill、原生插件清单、hooks、脚本、模板、说明和本地 marketplace，不包含凭据、目标项目策略或报告。解压后可用 `codex plugin marketplace add ./playbook-testing` 注册，再执行相同的 plugin add 命令。
 
-本仓库 CI 在 Linux、Windows 与 macOS 上验证实际提交/推送 hook、命令、证据和失败路径，并构建分发包。它不会部署应用。源自微软 Playbook 的原则均在参考资料中注明；该插件并非微软或 OpenAI 的官方产品。
+本仓库 CI 在 Windows/Linux/macOS 验证 Git 快照、失败路径、证据和**真实 Codex 插件安装及 hook 发现**；原生测试保持待信任状态，不代替用户批准，也不宣称已验证桌面端实际事件派发。执行器仅使用 Python 标准库。
+
+带 hooks 的插件分发与公共目录支持以 [OpenAI 打包说明](https://developers.openai.com/plugins/build/plugins) 为准。本插件不是微软或 OpenAI 官方产品。

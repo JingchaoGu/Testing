@@ -25,6 +25,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Codex for native hook discovery regression
+        run: npm install --global @openai/codex@0.154.0
       - name: Run required checks
         run: python scripts/quality.py run --stage pr
       - name: Verify current evidence

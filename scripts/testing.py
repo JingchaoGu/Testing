@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import sys
 
+import codex_hooks
+import delivery_hook
 import install_git_hooks
 import quality
 
@@ -48,14 +50,13 @@ def hooks(repo, action):
         if policy.get("agent_hooks") is not enabled:
             policy["agent_hooks"] = enabled
             quality.write_json(path, policy)
-    return {"agent_hooks": policy.get("agent_hooks") is True,
-            "codex_trust": "Review current definitions in /hooks; this command does not change trust",
+    return {"agent_hooks": policy.get("agent_hooks") is True, "agent_readiness": agent_issues(policy),
             "git_hooks": "unchanged"}
 
 
 def doctor(repo):
     result = {"repo": str(repo), "issues": [], "tests_run": False,
-              "codex_trust": "not inspected; review /hooks",
+              "codex": {"status": "not-inspected", "next_step": "Run doctor --runtime or hooks status using the active host CLI"},
               "remote_rules": "not inspected"}
     try:
         policy = quality.load_policy(repo)
@@ -99,6 +100,11 @@ def doctor(repo):
         else "not generated here; inspect existing CI/CD or complete init"
         for name, path in (("pr", ".github/workflows/playbook-quality.yml"),
                            ("delivery", ".github/workflows/playbook-delivery.yml"))}
+    receipt = repo / quality.RESULTS / "last-hook-event.json"
+    try:
+        result["last_hook_event"] = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        result["last_hook_event"] = None
     return result
 
 
@@ -157,8 +163,12 @@ def main():
         command.add_argument("--repo", default=".")
         if name == "check":
             command.add_argument("--stage", choices=quality.STAGES, default="task-finish")
+        elif name == "doctor":
+            command.add_argument("--runtime", action="store_true", help="Also query Codex's read-only hook registry")
+            command.add_argument("--codex", help="CLI executable belonging to the active Codex host")
         elif name == "hooks":
             command.add_argument("action", choices=("on", "off", "status"), default="status", nargs="?")
+            command.add_argument("--codex", help="CLI executable belonging to the active Codex host")
         elif name in ("pin", "unpin"):
             command.add_argument("names", choices=tuple(COMMANDS), nargs="+")
     args = parser.parse_args()
@@ -169,14 +179,28 @@ def main():
         else:
             repo = quality.repository(args.repo)
             if args.command == "check":
-                result = quality.run(repo, args.stage)
+                if args.stage in delivery_hook.PHASES:
+                    import os
+                    result = delivery_hook.run_delivery(repo, args.stage, os.environ.get("TESTING_ENVIRONMENT", ""),
+                        os.environ.get("TESTING_ARTIFACT", ""), os.environ.get("TESTING_REVISION"))
+                else:
+                    result = quality.run(repo, args.stage)
             elif args.command == "doctor":
                 result = doctor(repo)
+                if args.runtime:
+                    result["codex"] = codex_hooks.inspect(repo, args.codex)
+                    if result.get("agent_hooks") and result["codex"]["status"] != "trusted":
+                        result["issues"].append("Codex automatic hooks are not confirmed active: " + result["codex"]["status"])
             elif args.command == "hooks":
                 result = hooks(repo, args.action)
+                result["codex"] = codex_hooks.inspect(repo, args.codex)
+                result["automatic_checks"] = ("disabled" if not result["agent_hooks"] else
+                    "ready" if result["codex"]["status"] == "trusted" and not result["agent_readiness"] else "pending")
             else:
                 result = shortcuts(repo, args.names, remove=args.command == "unpin")
         print(json.dumps(result, ensure_ascii=False, indent=2))
+        if args.command == "hooks" and args.action == "status" and result["automatic_checks"] == "pending":
+            return 1
         return 1 if result.get("issues") or result.get("status") in ("failed", "error") else 0
     except (quality.QualityError, OSError, ValueError) as exc:
         print(f"playbook-testing: {exc}", file=sys.stderr)

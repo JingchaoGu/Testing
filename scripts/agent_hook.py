@@ -28,7 +28,7 @@ def handle(event):
     except quality.QualityError:
         return {}
     if not (repo / quality.POLICY).is_file():
-        return (context(name, "Playbook Testing is available. Run $playbook-testing init to map project tests before enabling hooks.")
+        return (context(name, "Playbook Testing is available. Run $playbook-testing init to plan and build suitable tests by component and delivery stage before enabling hooks.")
                 if name == "SessionStart" else {})
     try:
         policy = quality.load_policy(repo)
@@ -45,7 +45,7 @@ def handle(event):
             if not state:
                 state = {"baseline": snapshot, "last_seen": snapshot, "continuations": 0}
                 quality.write_json(path, state)
-            return context(name, "Playbook Testing is enabled: edit gives feedback; task-finish verifies completion. Preserve failing evidence and add regression coverage for fixes.")
+            return context(name, "Playbook Testing is enabled. Read TESTING.md or the project's existing test plan; map changed components and acceptance criteria to suitable tests, and update tests/stages when risks or boundaries change. Use $playbook-testing plan for gaps. edit gives feedback; task-finish verifies local completion. Preserve failing evidence and add regression coverage for fixes; report outstanding CI/release conditions separately.")
         if name == "PostToolUse":
             if snapshot == state.get("last_seen"):
                 return {}

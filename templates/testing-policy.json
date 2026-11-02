@@ -1,6 +1,7 @@
 {
   "version": 1,
   "agent_hooks": false,
+  "required_stages": ["edit", "task-finish", "commit", "push", "pr"],
   "checks": {},
   "stages": {
     "edit": [],

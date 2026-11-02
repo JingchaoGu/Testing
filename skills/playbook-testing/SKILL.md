@@ -1,11 +1,13 @@
 ---
 name: playbook-testing
-description: "将 Microsoft Engineering Playbook 测试逻辑落实为分阶段工作流。支持 $playbook-testing init、plan、check、fix、doctor、hooks、ci、release 与 pin/unpin 快捷入口；用于测试策略、AI 编码代理 hook、Git pre-commit/pre-push、PR CI 与发布门禁的建设、执行及审计。"
+description: "依据 Microsoft Engineering Playbook，为新项目和已有项目按模块风险与交付阶段选择、建设和执行测试，并用代理/Git/CI/CD hooks 落实门禁。支持 $playbook-testing init、plan、check、fix、doctor、hooks、ci、release 与 pin/unpin；用于测试策略、测试缺口建设与分阶段验证。"
 ---
 
 # Playbook 测试工作流
 
 将“验收标准 → 用例与风险 → 快速反馈 → 合并门禁 → 部署验证 → 生产反馈 → 回归保护”落实到用户指定的仓库。复用其语言、测试框架、脚本与流水线；只建设当前任务需要的阶段。
+
+核心职责是决定项目各部分该测什么、在哪个阶段测、怎样触发及何时能够放行。init/plan 先按 [测试动作决策](references/test-actions.md) 从验收目标和风险给出模块与阶段矩阵，再补建缺失测试并接线。已有测试属于输入，不决定测试范围；没有测试的新项目同样需要适用的建议和实现。init 在项目 TESTING.md 或已有同类计划中记录策略与落地状态。
 
 本技能提炼微软 ISE Engineering Playbook 的测试原则；hook 分配与证据契约是工程化建议，不是微软官方 hook 实现。本插件已包含共享执行器与 Codex hooks；新项目通过 [setup](../setup/SKILL.md) 映射真实测试命令后接入，安装插件本身不会配置 Git 或远端门禁。
 
@@ -15,8 +17,8 @@ description: "将 Microsoft Engineering Playbook 测试逻辑落实为分阶段�
 
 | 命令 | 作用 |
 | --- | --- |
-| `init` | 引导新项目或接入已有测试，配置代理检查和 Git hooks；CI 按需接入 |
-| `plan` | 验收标准、风险、测试层次和阶段方案 |
+| `init` | 新/旧项目的测试策略、缺失测试建设及 hooks 接入；CI 按需接入 |
+| `plan` | 按模块和风险给出具体测试动作、阶段与退出条件 |
 | `check [阶段]` | 运行既有阶段，默认 task-finish |
 | `fix [阶段]` | 定位失败、最小修复、补回归并复测 |
 | `doctor` | 只读检查策略、hook 包装脚本和证据状态 |
@@ -38,6 +40,7 @@ description: "将 Microsoft Engineering Playbook 测试逻辑落实为分阶段�
 
 | 当前需要 | 阅读 |
 | --- | --- |
+| 给项目各部分与阶段选择测试、补建设并绑定触发点 | [测试动作决策](references/test-actions.md) |
 | 决定测什么、何时测、什么算完成 | [核心模型与原文依据](references/core-model.md) |
 | 接入编码代理的编辑后、结束前事件 | [代理 hook](references/agent-hooks.md) |
 | 接入提交、推送检查 | [Git hook](references/git-hooks.md) |

@@ -72,6 +72,9 @@ def load_policy(repo):
             raise QualityError(f"Invalid stage: {name}")
         if len(set(selected)) != len(selected):
             raise QualityError(f"Duplicate checks in {name}")
+    required = policy.get("required_stages", [])
+    if not isinstance(required, list) or any(stage not in STAGES for stage in required) or len(set(required)) != len(required):
+        raise QualityError("required_stages must be a unique list of known stages")
     return policy
 
 

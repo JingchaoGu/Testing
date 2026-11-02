@@ -132,6 +132,22 @@ class RepositoryTests(unittest.TestCase):
         self.save_policy()
         self.assertEqual(quality.run(self.repo, "pr")["status"], "passed")
 
+    def test_required_stages_detect_unmapped_core_checks_and_reject_invalid_definitions(self):
+        self.policy["required_stages"] = ["task-finish", "push"]
+        self.policy["stages"]["push"] = []
+        self.save_policy()
+        self.assertEqual(testing.doctor(self.repo)["unconfigured_required_stages"], ["push"])
+        process = subprocess.run([sys.executable, str(SCRIPTS / "testing.py"), "doctor", "--repo", str(self.repo)],
+                                 capture_output=True, text=True, encoding="utf-8")
+        self.assertNotEqual(process.returncode, 0)
+        self.assertTrue(json.loads(process.stdout)["issues"])
+        for invalid in ("push", ["unknown"], ["edit", "edit"], [1]):
+            with self.subTest(required=invalid):
+                self.policy["required_stages"] = invalid
+                self.save_policy()
+                with self.assertRaises(quality.QualityError):
+                    quality.load_policy(self.repo)
+
     def test_missing_or_tampered_evidence_is_rejected(self):
         evidence = self.repo / quality.RESULTS / "pr.json"
         self.assertFalse(quality.verify(self.repo, "pr", evidence))

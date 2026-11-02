@@ -1,8 +1,10 @@
 # Playbook Testing — Codex Plugin
 
-将微软 ISE Engineering Playbook 的测试原则落成可执行的 **skill + Codex hooks + Git hooks + CI/CD 检查入口**。Python 3.10+，只使用标准库；需要 Git。仓库默认不启用代理自动执行。
+依据微软 ISE Engineering Playbook，为项目各部分选择测试动作、补建测试，并通过 **Codex hooks + Git hooks + CI/CD 门禁**在适当阶段执行。执行器需要 Python 3.10+ 和 Git，只使用标准库；仓库默认不启用代理自动执行。
 
 核心流程：验收标准 → 用例与风险 → 开发快速反馈 → 提交/推送检查 → PR 门禁 → 部署后冒烟 → 发布验证 → 生产缺陷回归。
+
+skill 先回答“这个模块要证明什么、采用哪类测试、在哪个阶段运行”，再建设测试及 hook 接线。已有测试是输入；新项目同样会得到单元、集成、契约、UI/E2E、安全、性能与恢复等适用动作的建议，明确当前实施、待接入和不适用的部分。项目策略落在 `TESTING.md` 或已有同类计划中，并关联实际检查 ID、阶段和触发位置。详见 [测试动作决策](skills/playbook-testing/references/test-actions.md)。
 
 ## 安装与分享
 
@@ -50,7 +52,7 @@ $playbook-testing hooks status
 $playbook-testing pin check doctor fix
 ```
 
-`init` 支持已有项目和新项目。已有项目复用实际测试；空目录会引导选择技术栈与最小功能，创建项目、真实测试和本地 Git，再配置测试命令与 hooks。已经提供的信息不重复询问；上次只生成了空策略时会接续未完成步骤。可以附加“只配置代理 hooks”等范围约束。CI 用 `$playbook-testing ci` 单独接入，或在 init 时明确要求。
+`init` 支持已有项目和新项目：先分析模块、风险和交付阶段，给出具体测试动作并记录策略，再补建缺失的测试和触发点。空目录会引导选择技术栈与最小功能，创建项目、真实测试和本地 Git，再配置测试命令与 hooks。已经提供的信息不重复询问；上次只生成了空策略时会接续未完成步骤。可以附加“只配置代理 hooks”等范围约束。CI 用 `$playbook-testing ci` 单独接入，或在 init 时明确要求。
 
 新项目可以直接给出技术栈与用途：
 
@@ -59,13 +61,13 @@ $playbook-testing init python 创建一个将标签去空格、转小写并去�
 $playbook-testing init nodejs 创建一个校验待办事项标题的小工具
 ```
 
-未提供这些信息时，init 集中询问一次，然后继续完成接入。Python/Node.js 轻量项目可使用运行时自带测试能力；其他技术栈沿用其原生工具。项目代码与测试由代理按需求创建，setup 脚本负责 Git 与测试运行器接入；复制空策略只代表骨架完成。doctor 对没有可执行阶段的策略报告初始化未完成，hooks 保持关闭。新项目初始化不自动提交或推送代码。
+未提供这些信息时，init 集中询问一次，然后继续完成接入。Python/Node.js 轻量项目可使用运行时自带测试能力；其他技术栈沿用其原生工具。项目代码与测试由代理按需求创建，setup 脚本负责 Git 与测试运行器接入；复制空策略只代表骨架完成。`required_stages` 明确项目核心阶段，doctor 对缺少检查的核心阶段返回非零。实际 hook/CI 触发、远端规则与执行结果分别验证；仅有配置不代表门禁生效。新项目初始化不自动提交或推送代码。
 
 | 命令 | 用途 |
 | --- | --- |
 | 不带参数 | 展示菜单；不自动修改项目 |
-| `init` | 新项目引导或已有项目发现、真实测试、验证、hook 接入 |
-| `plan` | 从验收标准与风险制定分阶段方案 |
+| `init` | 新/旧项目的测试策略、缺失测试建设及 hooks 接入 |
+| `plan` | 按模块与风险建议具体测试动作、阶段、触发点和退出条件 |
 | `check [阶段]` | 运行现有检查，默认 task-finish；失败返回失败 |
 | `fix [阶段]` | 读失败证据、最小修复、必要回归并复测 |
 | `doctor` | 只读检查配置与证据，明确尚未核实的信任/远端规则 |
@@ -117,6 +119,7 @@ Windows 将 `python3` 换成 `py -3`。接入工具只写项目本地文件；�
 ## 配置、验证和限制
 
 - [命令与阶段配置](docs/configuration.md)
+- [按模块和交付阶段选择测试动作](skills/playbook-testing/references/test-actions.md)
 - [Playbook 原则、适配决策与来源](skills/playbook-testing/references/core-model.md)
 - [信任边界与已知限制](docs/limitations.md)
 
@@ -131,6 +134,6 @@ python3 scripts/quality.py verify --stage pr
 python3 scripts/package_plugin.py
 ```
 
-ZIP 默认输出到 `dist/playbook-testing-0.3.0.zip`。包含插件清单、两个 skills、命令路由、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
+ZIP 默认输出到 `dist/playbook-testing-0.4.0.zip`。包含插件清单、两个 skills、命令路由、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
 
 本仓库 CI 在 Linux、Windows 与 macOS 上验证实际提交/推送 hook、命令、证据和失败路径，并构建分发包。它不会部署应用。源自微软 Playbook 的原则均在参考资料中注明；该插件并非微软或 OpenAI 的官方产品。

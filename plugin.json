@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "playbook-testing",
-  "version": "0.3.0",
-  "description": "Engineering Playbook testing workflows with executable Codex, Git and CI/CD checks.",
+  "version": "0.4.0",
+  "description": "Playbook-based test strategy and construction with executable Codex, Git and CI/CD gates.",
   "author": {"name": "JingchaoGu"},
   "repository": "https://github.com/JingchaoGu/Testing",
   "extensions": {
@@ -13,7 +13,7 @@
       "interface": {
         "displayName": "Playbook Testing",
         "shortDescription": "Stage testing across coding, Git and delivery",
-        "longDescription": "Use project-specific test commands, snapshot-bound evidence and smoke-first promotion checks.",
+        "longDescription": "Select and build tests by component risk and delivery stage, then enforce checks through hooks and snapshot-bound evidence.",
         "developerName": "JingchaoGu",
         "category": "Productivity",
         "capabilities": ["Read", "Write"],

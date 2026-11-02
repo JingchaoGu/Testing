@@ -4,6 +4,10 @@
 
 执行器在 Git 仓库根读取 `.testing-policy.json`；它与技能中的概念性 YAML 模板不是同一个运行格式。setup 初始配置为空，任何空阶段都会拒绝执行，避免假绿。
 
+聊天中的 `$playbook-testing init` 可从空目录引导创建项目；已知技术栈和用途时继续创建真实代码与测试，否则集中询问一次。底层 setup 仅在显式传入 `--init-git` 时创建本地 Git，且不会在已有父仓库中创建嵌套仓库。复制空策略属于未完成状态，doctor 会报告缺少可执行阶段，代理 hooks 不能启用。详见 [新项目初始化](../skills/setup/references/new-project.md)。
+
+setup 保留 .gitignore 原内容，并补齐 `.testing-results/` 与 `__pycache__/`，避免报告及 Python 运行缓存被当作源代码变化；项目的构建产物、依赖目录等仍按自身技术栈配置忽略规则。
+
 Python unittest 项目示例（文件已由 setup 复制到 `.testing-tools/`）：
 
 ```json

@@ -61,6 +61,6 @@ def package(root, output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/playbook-testing-0.2.1.zip")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/playbook-testing-0.3.0.zip")
     args = parser.parse_args()
     print(package(ROOT, args.output))

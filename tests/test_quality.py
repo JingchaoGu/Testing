@@ -270,6 +270,77 @@ class RepositoryTests(unittest.TestCase):
             self.assertTrue(all("/.git/" not in name and "/.testing-results/" not in name and "/__pycache__/" not in name for name in names))
             self.assertNotIn("playbook-testing/.testing-policy.json", names)
 
+    def test_new_project_cli_requires_explicit_git_initialization(self):
+        project = Path(self.temporary.name) / "new project"
+        project.mkdir()
+        notes = project / "README.md"
+        notes.write_text("Existing project requirements", encoding="utf-8")
+        command = [sys.executable, str(SCRIPTS / "setup_repo.py"), "--repo", str(project)]
+        rejected = subprocess.run(command, capture_output=True, text=True)
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertEqual(sorted(path.name for path in project.iterdir()), ["README.md"])
+        created = subprocess.run(command + ["--init-git"], capture_output=True, text=True)
+        self.assertEqual(created.returncode, 0, created.stderr)
+        self.assertEqual(quality.repository(project), project.resolve())
+        self.assertEqual(notes.read_text(), "Existing project requirements")
+        self.assertEqual(quality.git(project, "ls-files"), "")
+        self.assertEqual(quality.load_policy(project)["agent_hooks"], False)
+        self.assertTrue(testing.doctor(project)["issues"])
+        with self.assertRaises(quality.QualityError):
+            testing.hooks(project, "on")
+        repeated = subprocess.run(command + ["--init-git"], capture_output=True, text=True)
+        self.assertEqual(repeated.returncode, 0, repeated.stderr)
+
+    def test_new_project_does_not_modify_parent_repository_or_broken_metadata(self):
+        child = self.repo / "new project"
+        child.mkdir()
+        before = (self.repo / quality.POLICY).read_bytes()
+        with self.assertRaises(quality.QualityError):
+            setup_repo.prepare_repository(child, init_git=True)
+        self.assertEqual(list(child.iterdir()), [])
+        self.assertEqual((self.repo / quality.POLICY).read_bytes(), before)
+        broken = Path(self.temporary.name) / "broken project"
+        broken.mkdir()
+        (broken / ".git").write_text("invalid metadata", encoding="utf-8")
+        with self.assertRaises(quality.QualityError):
+            setup_repo.prepare_repository(broken, init_git=True)
+        self.assertEqual((broken / ".git").read_text(), "invalid metadata")
+        bare = Path(self.temporary.name) / "bare repository"
+        bare.mkdir()
+        quality.git(bare, "init", "--bare", "--quiet")
+        for metadata_dir in (bare, self.repo / ".git"):
+            with self.assertRaises(quality.QualityError):
+                setup_repo.prepare_repository(metadata_dir, init_git=True)
+            self.assertFalse((metadata_dir / ".git").exists())
+
+    def test_new_project_runs_real_tests_before_hook_enablement(self):
+        project = Path(self.temporary.name) / "python project"
+        project.mkdir()
+        setup_repo.setup(setup_repo.prepare_repository(project, init_git=True))
+        (project / "labels.py").write_text('def normalize(value):\n    return " ".join(value.split()).lower()\n', encoding="utf-8")
+        tests = project / "tests"
+        tests.mkdir()
+        (tests / "test_labels.py").write_text('''import unittest
+from labels import normalize
+class LabelTests(unittest.TestCase):
+    def test_spaces_and_case(self): self.assertEqual(normalize("  HELLO   World "), "hello world")
+    def test_empty(self): self.assertEqual(normalize("  "), "")
+''', encoding="utf-8")
+        policy = {"version": 1, "agent_hooks": False, "checks": {"unit": {"kind": "test", "timeout": 20,
+            "argv": ["{python}", "{repo}/.testing-tools/unittest_junit.py", "--start", "tests", "--report", "{report}"]}},
+            "stages": {stage: ["unit"] for stage in ("edit", "task-finish", "commit", "push", "pr")}}
+        quality.write_json(project / quality.POLICY, policy)
+        record = quality.run(project, "task-finish")
+        self.assertEqual(record["status"], "passed", record)
+        self.assertEqual(record["checks"][0]["counts"]["executed"], 2)
+        self.assertTrue(testing.hooks(project, "on")["agent_hooks"])
+        installed = subprocess.run([sys.executable, str(project / ".testing-tools/install_git_hooks.py"),
+                                   "--repo", str(project)], capture_output=True, text=True)
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        self.assertFalse(testing.doctor(project)["issues"])
+        (project / "labels.py").write_text('def normalize(value):\n    return value\n', encoding="utf-8")
+        self.assertEqual(quality.run(project, "task-finish")["status"], "failed")
+
     def test_check_command_uses_default_stage_and_propagates_failure(self):
         for mode, expected in (("fail", 1), ("pass", 0)):
             self.mode(mode)

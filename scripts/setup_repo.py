@@ -7,6 +7,31 @@ import sys
 import quality
 
 
+def prepare_repository(path, init_git=False):
+    target = Path(path).resolve()
+    if not target.is_dir():
+        raise quality.QualityError("Choose an existing project directory before setup")
+    try:
+        repo = quality.repository(target)
+    except quality.QualityError as exc:
+        if not init_git:
+            raise quality.QualityError("Not a Git worktree. For a new project, choose its stack and purpose, then use --init-git") from exc
+        metadata = target / ".git"
+        if metadata.exists() or metadata.is_symlink():
+            raise quality.QualityError("Existing Git metadata cannot be resolved; inspect it before initializing") from exc
+        try:
+            quality.git(target, "rev-parse", "--git-dir")
+        except quality.QualityError:
+            pass
+        else:
+            raise quality.QualityError("Target is existing Git metadata, not a project worktree; choose a project directory") from exc
+        quality.git(target, "init", "--quiet")
+        repo = quality.repository(target)
+    if init_git and repo != target:
+        raise quality.QualityError("Target belongs to a parent Git repository; use its root or choose a directory outside it")
+    return repo
+
+
 def setup(repo, github=False):
     plugin = quality.PLUGIN
     copies = {
@@ -27,20 +52,22 @@ def setup(repo, github=False):
         destination.write_bytes(source.read_bytes())
     ignore = repo / ".gitignore"
     content = ignore.read_text(encoding="utf-8") if ignore.exists() else ""
-    if ".testing-results/" not in content.splitlines():
-        ignore.write_text(content.rstrip("\n") + "\n.testing-results/\n", encoding="utf-8")
+    missing = [entry for entry in (".testing-results/", "__pycache__/") if entry not in content.splitlines()]
+    if missing:
+        ignore.write_text(content.rstrip("\n") + "\n" + "\n".join(missing) + "\n", encoding="utf-8")
     return list(copies)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default=".")
+    parser.add_argument("--init-git", action="store_true", help="Initialize Git in this exact directory for an explicitly requested new project")
     parser.add_argument("--github-workflow", action="store_true")
     args = parser.parse_args()
     try:
-        for destination in setup(quality.repository(args.repo), args.github_workflow):
+        for destination in setup(prepare_repository(args.repo, args.init_git), args.github_workflow):
             print(destination)
-        print("Map real check commands in .testing-policy.json before enabling hooks or CI.")
+        print("Testing scaffold copied. Map and run real checks before declaring init complete or enabling hooks/CI.")
         return 0
     except (quality.QualityError, OSError) as exc:
         print(f"playbook-testing: {exc}", file=sys.stderr)

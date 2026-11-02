@@ -50,12 +50,21 @@ $playbook-testing hooks status
 $playbook-testing pin check doctor fix
 ```
 
-`init` 发现项目已有测试并配置真实命令，默认接入项目代理检查和 Git pre-commit/pre-push；可以附加“只配置代理 hooks”等范围约束。CI 用 `$playbook-testing ci` 单独接入，或在 init 时明确要求。空测试策略不会被当作初始化完成。
+`init` 支持已有项目和新项目。已有项目复用实际测试；空目录会引导选择技术栈与最小功能，创建项目、真实测试和本地 Git，再配置测试命令与 hooks。已经提供的信息不重复询问；上次只生成了空策略时会接续未完成步骤。可以附加“只配置代理 hooks”等范围约束。CI 用 `$playbook-testing ci` 单独接入，或在 init 时明确要求。
+
+新项目可以直接给出技术栈与用途：
+
+```text
+$playbook-testing init python 创建一个将标签去空格、转小写并去重的工具
+$playbook-testing init nodejs 创建一个校验待办事项标题的小工具
+```
+
+未提供这些信息时，init 集中询问一次，然后继续完成接入。Python/Node.js 轻量项目可使用运行时自带测试能力；其他技术栈沿用其原生工具。项目代码与测试由代理按需求创建，setup 脚本负责 Git 与测试运行器接入；复制空策略只代表骨架完成。doctor 对没有可执行阶段的策略报告初始化未完成，hooks 保持关闭。新项目初始化不自动提交或推送代码。
 
 | 命令 | 用途 |
 | --- | --- |
 | 不带参数 | 展示菜单；不自动修改项目 |
-| `init` | 项目发现、测试映射、验证、hook 接入 |
+| `init` | 新项目引导或已有项目发现、真实测试、验证、hook 接入 |
 | `plan` | 从验收标准与风险制定分阶段方案 |
 | `check [阶段]` | 运行现有检查，默认 task-finish；失败返回失败 |
 | `fix [阶段]` | 读失败证据、最小修复、必要回归并复测 |
@@ -84,6 +93,8 @@ python3 /path/to/project/.testing-tools/testing.py pin check doctor --repo /path
 ```
 
 Windows 将 `python3` 换成 `py -3`。接入工具只写项目本地文件；遇到不同内容的已有文件或自定义 Git hook 管理器会保留并提示人工合并。
+
+新项目目录已有明确技术栈和用途时，创建相应代码与测试，再给 setup 增加 `--init-git`。它仅在指定目录创建本地 Git，目标位于其他父仓库内时拒绝操作；默认不加此参数会保留原有 Git 前置条件。详细步骤见 [新项目初始化](skills/setup/references/new-project.md)。
 
 设置 `agent_hooks: true` 且信任定义后才启用该项目的代理测试。`hooks on` 验证 edit/task-finish 非空且配置超时总和分别不超过 100/150 秒，给事件超时留出余量；长测放入 Git/CI。`edit` 用于快速反馈，允许 TDD 的暂时失败；`task-finish` 在结束时检查。失败最多自动请求一次继续修复，仍失败则要求明确报告未验证，不把结果改成通过。
 
@@ -120,6 +131,6 @@ python3 scripts/quality.py verify --stage pr
 python3 scripts/package_plugin.py
 ```
 
-ZIP 默认输出到 `dist/playbook-testing-0.2.1.zip`。包含插件清单、两个 skills、命令路由、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
+ZIP 默认输出到 `dist/playbook-testing-0.3.0.zip`。包含插件清单、两个 skills、命令路由、hooks、脚本、模板、说明和本地 marketplace；不打包 Git 数据、测试报告、缓存、目标项目策略或凭据。
 
 本仓库 CI 在 Linux、Windows 与 macOS 上验证实际提交/推送 hook、命令、证据和失败路径，并构建分发包。它不会部署应用。源自微软 Playbook 的原则均在参考资料中注明；该插件并非微软或 OpenAI 的官方产品。

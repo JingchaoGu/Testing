@@ -15,7 +15,7 @@ description: "将 Microsoft Engineering Playbook 测试逻辑落实为分阶段�
 
 | 命令 | 作用 |
 | --- | --- |
-| `init` | 发现真实测试，配置项目代理检查和 Git hooks；CI 按需接入 |
+| `init` | 引导新项目或接入已有测试，配置代理检查和 Git hooks；CI 按需接入 |
 | `plan` | 验收标准、风险、测试层次和阶段方案 |
 | `check [阶段]` | 运行既有阶段，默认 task-finish |
 | `fix [阶段]` | 定位失败、最小修复、补回归并复测 |

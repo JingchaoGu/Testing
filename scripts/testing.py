@@ -9,7 +9,7 @@ import install_git_hooks
 import quality
 
 COMMANDS = {
-    "init": "Discover tests and connect project hooks",
+    "init": "Create a new project or connect existing project tests and hooks",
     "plan": "Map acceptance criteria and risks to testing stages",
     "check": "Run an existing testing stage (default: task-finish)",
     "fix": "Diagnose a failed check, repair and rerun",
@@ -60,6 +60,8 @@ def doctor(repo):
     try:
         policy = quality.load_policy(repo)
         result["stages"] = {name: checks for name, checks in policy["stages"].items() if checks}
+        if not result["stages"]:
+            result["issues"].append("Initialization incomplete: no executable testing stages. Continue $playbook-testing init to create or map real tests")
         result["agent_hooks"] = policy.get("agent_hooks") is True
         result["agent_readiness"] = agent_issues(policy)
         if result["agent_hooks"]:
